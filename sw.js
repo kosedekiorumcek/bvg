@@ -1,26 +1,33 @@
-const CACHE_NAME = 'bvg-radar-v1';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-];
+const CACHE_NAME = 'bvg-radar-v2';
 
-// Dosyaları telefona önbellekleme
 self.addEventListener('install', (event) => {
+  // Yeni sürüm geldiğinde hemen devreye gir
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return cache.addAll([
+        './',
+        './index.html',
+        './manifest.json'
+      ]).catch(err => console.log("Önbellek atlandı:", err));
     })
   );
 });
 
-// Ağ isteklerini yönetme
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      );
+    }).then(() => self.clients.claim())
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((response) => {
       return response || fetch(event.request);
-    })
+    }).catch(() => fetch(event.request))
   );
 });
