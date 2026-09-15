@@ -2,15 +2,22 @@
   "name": "Berlin U-Bahn Radar",
   "short_name": "BVG Radar",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0b0e14",
-  "theme_color": "#151b23",
+  "theme_color": "#ffffff",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Berlin_U-Bahn_Logo.svg",
-      "sizes": "192x192 512x512",
-      "type": "image/svg+xml",
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Berlin_U-Bahn_Logo.svg/192px-Berlin_U-Bahn_Logo.svg.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Berlin_U-Bahn_Logo.svg/512px-Berlin_U-Bahn_Logo.svg.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]
