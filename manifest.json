@@ -1,0 +1,17 @@
+{
+  "name": "Berlin U-Bahn Radar",
+  "short_name": "BVG Radar",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b0e14",
+  "theme_color": "#151b23",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Berlin_U-Bahn_Logo.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
