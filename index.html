@@ -788,15 +788,39 @@
         });
 
         // ========================================================
-        // 7. PWA SERVICE WORKER KAYDI
+        // 7. PWA VE OTOMATİK YÜKLEME MOTORU
         // ========================================================
+        let deferredPrompt;
+
+        // Üst bara "Uygulamayı Yükle" butonu ekle
+        const headerContainer = document.querySelector('.status-container');
+        const installBtn = document.createElement('button');
+        installBtn.innerText = "📲 Uygulamayı Yükle";
+        installBtn.style.cssText = "background: #0284c7; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; cursor: pointer; display: none; margin-left: 8px;";
+        headerContainer.appendChild(installBtn);
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Chrome'un varsayılan mini çubuğunu engelle, butonumuzu göster
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.style.display = 'inline-block';
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    installBtn.style.display = 'none';
+                }
+                deferredPrompt = null;
+            }
+        });
+
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(() => console.log("PWA Service Worker başarıyla kaydedildi."))
-                    .catch(err => console.log("PWA Kayıt Hatası:", err));
+                    .then((reg) => console.log("PWA Aktif, Kapsam:", reg.scope))
+                    .catch(err => console.log("PWA Hatası:", err));
             });
         }
-    </script>
-</body>
-</html>
