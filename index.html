@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Berlin Canlı Ulaşım Radarı (U-Bahn, S-Bahn & M45)</title>
+    <title>Berlin Canlı Ulaşım Radarı</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
@@ -66,26 +66,25 @@
             color: #0f172a;
         }
 
-        .stat-green { color: #16a34a; }
-        .stat-red { color: #dc2626; }
-
         .badges-wrapper {
             display: flex;
-            gap: 4px;
+            gap: 5px;
             flex-wrap: wrap;
-            max-height: 48px;
+            max-height: 52px;
             overflow-y: auto;
         }
 
         .line-tag {
-            padding: 2px 6px;
+            padding: 3px 8px;
             border-radius: 4px;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: bold;
             color: #ffffff;
             cursor: pointer;
             user-select: none;
+            transition: opacity 0.2s, transform 0.1s;
         }
+        .line-tag:active { transform: scale(0.95); }
 
         #map {
             flex: 1;
@@ -94,12 +93,12 @@
         }
 
         .train-carriage {
-            transition: transform 0.05s linear;
+            transition: fill 0.25s ease, opacity 0.25s ease;
         }
 
         .station-node {
             cursor: pointer;
-            filter: drop-shadow(0 0 2px rgba(0,0,0,0.35));
+            transition: fill 0.25s ease, opacity 0.25s ease;
         }
 
         .leaflet-tile-pane {
@@ -107,29 +106,26 @@
             opacity: 0.85;
         }
 
-        /* Araç Bilgi Kartı (HUD) */
-        .hud-card {
-            font-size: 12px;
+        /* Bilgi Kartı (HUD) */
+        .simple-hud {
+            font-size: 13px;
             line-height: 1.4;
+            padding: 2px 4px;
         }
-        .hud-title {
-            font-size: 14px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 4px;
-        }
-        .delay-tag {
+        .hud-line-header {
             display: inline-block;
-            padding: 2px 5px;
-            border-radius: 3px;
-            font-weight: bold;
-            color: white;
-            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 13px;
+            margin-bottom: 6px;
         }
-        .delay-ok { background-color: #16a34a; }
-        .delay-warn { background-color: #dc2626; }
+        .hud-direction {
+            font-size: 13px;
+            color: #0f172a;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -137,24 +133,19 @@
     <header>
         <div class="stats-bar">
             <div class="stat-item">
-                <span>🚇 U-Bahn:</span>
+                <span>🚇 Metro (U):</span>
                 <span class="stat-val" id="cnt-ubahn">0</span>
             </div>
             <div class="stat-item">
-                <span>🚆 S-Bahn:</span>
+                <span>🚆 Banliyö (S):</span>
                 <span class="stat-val" id="cnt-sbahn">0</span>
             </div>
             <div class="stat-item">
-                <span>🚌 Otobüs:</span>
+                <span>🚌 Otobüs (Bus):</span>
                 <span class="stat-val" id="cnt-bus">0</span>
             </div>
-            <div class="stat-item">
-                <span>⏱️ Zamanında:</span>
-                <span class="stat-val stat-green" id="cnt-ontime">0 Hat</span>
-            </div>
-            <div class="stat-item">
-                <span>⚠️ Geciken:</span>
-                <span class="stat-val stat-red" id="cnt-delayed">0 Hat</span>
+            <div class="stat-item" id="active-focus-info" style="color: #64748b;">
+                Tümü Aktif (Odaklamak için hatta tıklayın)
             </div>
             <div id="install-slot"></div>
         </div>
@@ -167,23 +158,32 @@
 
     <script>
         // ========================================================
-        // 1. HARİTA ALTYAPISI
+        // 1. HARİTA ALTYAPISI VE KONTROLLER
         // ========================================================
         const map = L.map('map', {
             zoomSnap: 0.25,
             zoomDelta: 0.5
-        }).setView([52.5150, 13.3600], 12.0);
+        }).setView([52.5160, 13.3400], 12.0);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+        L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x},{y}.png', {
             maxZoom: 19,
             subdomains: ['a', 'b'],
             attribution: '&copy; OpenStreetMap contributors',
             referrerPolicy: 'no-referrer'
         }).addTo(map);
 
+        // Odaklama / Karartma Durumu
+        let selectedLineKey = null;
+        const FADED_COLOR = "#64748b"; // Seçili olmayan hatların bürüneceği füme renk
+        const FADED_OPACITY = 0.22;
+
         // ========================================================
-        // 2. ORTAK PARÇALAR VE HAT VERİLERİ (U, S, BUS)
+        // 2. RESMİ RENK VE GERÇEK YOL VERİLERİ (U, S, BUS)
         // ========================================================
+        const SBAHN_COLOR = "#00864e"; // Klasik resmi S-Bahn Yeşili
+        const BUS_COLOR = "#b91c1c";   // Resmi Otobüs Kırmızısı
+
+        // U-Bahn Ortak Parça
         const SHARED_U1_U3 = [
             { name: "Wittenbergplatz", coords: [52.5019, 13.3428] },
             { name: "Nollendorfplatz", coords: [52.4994, 13.3539] },
@@ -198,56 +198,67 @@
             { name: "Warschauer Straße", coords: [52.5058, 13.4494] }
         ];
 
-        // S-Bahn Doğu-Batı Stadtbahn Ortak Hattı
-        const SHARED_STADTBAHN = [
-            { name: "Westkreuz", coords: [52.5011, 13.2836] },
-            { name: "Charlottenburg", coords: [52.5047, 13.3033] },
-            { name: "Savignyplatz", coords: [52.5053, 13.3197] },
-            { name: "Zoologischer Garten", coords: [52.5073, 13.3326] },
-            { name: "Tiergarten", coords: [52.5139, 13.3364] },
-            { name: "Bellevue", coords: [52.5203, 13.3478] },
-            { name: "Hauptbahnhof", coords: [52.5258, 13.3689] },
-            { name: "Friedrichstraße", coords: [52.5203, 13.3869] },
-            { name: "Hackescher Markt", coords: [52.5225, 13.4022] },
-            { name: "Alexanderplatz", coords: [52.5214, 13.4111] },
-            { name: "Jannowitzbrücke", coords: [52.5153, 13.4181] },
-            { name: "Ostbahnhof", coords: [52.5106, 13.4347] },
-            { name: "Warschaür Straße", coords: [52.5058, 13.4494] },
-            { name: "Ostkreuz", coords: [52.5031, 13.4692] }
+        // S-Bahn Doğu-Batı Stadtbahn Ray Geometrisi
+        const REAL_STADTBAHN_WAYPOINTS = [
+            [52.5011, 13.2836], // Westkreuz
+            [52.5047, 13.3033], // Charlottenburg
+            [52.5053, 13.3197], // Savignyplatz
+            [52.5073, 13.3326], // Zoologischer Garten
+            [52.5110, 13.3350], [52.5139, 13.3364], // Tiergarten
+            [52.5175, 13.3420], [52.5203, 13.3478], // Bellevue
+            [52.5230, 13.3570], [52.5258, 13.3689], // Hauptbahnhof
+            [52.5225, 13.3780], [52.5203, 13.3869], // Friedrichstraße
+            [52.5225, 13.4022], // Hackescher Markt
+            [52.5214, 13.4111], // Alexanderplatz
+            [52.5153, 13.4181], // Jannowitzbrücke
+            [52.5106, 13.4347], // Ostbahnhof
+            [52.5058, 13.4494], // Warschauer Straße
+            [52.5031, 13.4692]  // Ostkreuz
         ];
 
-        // S-Bahn Ringbahn (Çember)
-        const RINGBAHN_STATIONS = [
-            { name: "Südkreuz", coords: [52.4753, 13.3653] },
-            { name: "Schöneberg", coords: [52.4792, 13.3517] },
-            { name: "Innsbrucker Platz", coords: [52.4786, 13.3433] },
-            { name: "Bundesplatz", coords: [52.4779, 13.3291] },
-            { name: "Heidelberger Platz", coords: [52.4800, 13.3117] },
-            { name: "Halensee", coords: [52.4961, 13.2889] },
-            { name: "Westkreuz", coords: [52.5011, 13.2836] },
-            { name: "Messe Nord/ICC", coords: [52.5078, 13.2817] },
-            { name: "Westend", coords: [52.5181, 13.2847] },
-            { name: "Jungfernheide", coords: [52.5303, 13.2997] },
-            { name: "Beusselstraße", coords: [52.5344, 13.3289] },
-            { name: "Westhafen", coords: [52.5362, 13.3441] },
-            { name: "Wedding", coords: [52.5422, 13.3664] },
-            { name: "Gesundbrunnen", coords: [52.5489, 13.3889] },
-            { name: "Schönhauser Allee", coords: [52.5494, 13.4161] },
-            { name: "Prenzlauer Allee", coords: [52.5442, 13.4278] },
-            { name: "Greifswalder Straße", coords: [52.5394, 13.4389] },
-            { name: "Landsberger Allee", coords: [52.5289, 13.4556] },
-            { name: "Frankfurter Allee", coords: [52.5136, 13.4750] },
-            { name: "Ostkreuz", coords: [52.5031, 13.4692] },
-            { name: "Treptower Park", coords: [52.4936, 13.4614] },
-            { name: "Sonnenallee", coords: [52.4736, 13.4564] },
-            { name: "Neukölln", coords: [52.4698, 13.4429] },
-            { name: "Hermannstraße", coords: [52.4678, 13.4314] },
-            { name: "Tempelhof", coords: [52.4708, 13.3856] },
-            { name: "Südkreuz", coords: [52.4753, 13.3653] }
+        // S-Bahn Ringbahn (Çember) Ray Geometrisi
+        const REAL_RINGBAHN_WAYPOINTS = [
+            [52.4753, 13.3653], // Südkreuz
+            [52.4792, 13.3517], // Schöneberg
+            [52.4786, 13.3433], // Innsbrucker Platz
+            [52.4779, 13.3291], // Bundesplatz
+            [52.4800, 13.3117], // Heidelberger Platz
+            [52.4961, 13.2889], // Halensee
+            [52.5011, 13.2836], // Westkreuz
+            [52.5078, 13.2817], // Messe Nord/ICC
+            [52.5181, 13.2847], // Westend
+            [52.5303, 13.2997], // Jungfernheide
+            [52.5344, 13.3289], // Beusselstraße
+            [52.5362, 13.3441], // Westhafen
+            [52.5422, 13.3664], // Wedding
+            [52.5489, 13.3889], // Gesundbrunnen
+            [52.5494, 13.4161], // Schönhauser Allee
+            [52.5442, 13.4278], // Prenzlauer Allee
+            [52.5394, 13.4389], // Greifswalder Straße
+            [52.5289, 13.4556], // Landsberger Allee
+            [52.5136, 13.4750], // Frankfurter Allee
+            [52.5031, 13.4692], // Ostkreuz
+            [52.4936, 13.4614], // Treptower Park
+            [52.4736, 13.4564], // Sonnenallee
+            [52.4698, 13.4429], // Neukölln
+            [52.4678, 13.4314], // Hermannstraße
+            [52.4708, 13.3856], // Tempelhof
+            [52.4753, 13.3653]  // Südkreuz
+        ];
+
+        // M45 Gerçek Cadde Güzergahı (Cadde kıvrımları dahil)
+        const REAL_M45_WAYPOINTS = [
+            [52.5597, 13.1969], // Johannesstift
+            [52.5510, 13.1990], [52.5430, 13.2005], [52.5357, 13.2008], // Rathaus Spandau
+            [52.5375, 13.2050], [52.5385, 13.2120], [52.5370, 13.2250], [52.5278, 13.2389], // Charlottenburger Chaussee
+            [52.5240, 13.2600], [52.5215, 13.2800], [52.5208, 13.2956], // Spandauer Damm / Schloss Charlottenburg
+            [52.5185, 13.3030], [52.5159, 13.3074], // Richard-Wagner-Platz
+            [52.5140, 13.3150], [52.5128, 13.3219], // Ernst-Reuter-Platz
+            [52.5100, 13.3270], [52.5074, 13.3327]  // Zoologischer Garten
         ];
 
         const NETWORK_LINES = {
-            // U-BAHN
+            // METRO (U-BAHN) - Yeraltı Pürüzsüz Eğrileri
             "U1": { type: "U", color: "#46963c", interval: 4.5, offset: 4, speed: 32, stations: [{ name: "Uhlandstraße", coords: [52.5028, 13.3256] }, { name: "Kurfürstendamm", coords: [52.5040, 13.3315] }, ...SHARED_U1_U3] },
             "U2": { type: "U", color: "#d63815", interval: 4.0, offset: 0, speed: 32, stations: [
                 { name: "Ruhleben", coords: [52.5256, 13.2414] }, { name: "Theodor-Heuss-Platz", coords: [52.5108, 13.2731] }, { name: "Bismarckstraße", coords: [52.5121, 13.3057] }, { name: "Zoologischer Garten", coords: [52.5073, 13.3326] }, { name: "Wittenbergplatz", coords: [52.5019, 13.3428] }, { name: "Potsdamer Platz", coords: [52.5097, 13.3758] }, { name: "Alexanderplatz", coords: [52.5214, 13.4111] }, { name: "Pankow", coords: [52.5672, 13.4114] }
@@ -262,33 +273,18 @@
                 { name: "Osloer Straße", coords: [52.5569, 13.3735] }, { name: "Leopoldplatz", coords: [52.5469, 13.3594] }, { name: "Westhafen", coords: [52.5362, 13.3441] }, { name: "Zoologischer Garten", coords: [52.5074, 13.3327] }, { name: "Spichernstraße", coords: [52.4965, 13.3310] }, { name: "Rathaus Steglitz", coords: [52.4562, 13.3210] }
             ]},
 
-            // S-BAHN (Stadtbahn, Ringbahn, Nord-Süd)
-            "S5": { type: "S", color: "#e35205", interval: 5.0, offset: 0, speed: 45, stations: [
-                { name: "Spandau", coords: [52.5344, 13.1975] }, ...SHARED_STADTBAHN, { name: "Strausberg Nord", coords: [52.5858, 13.8822] }
-            ]},
-            "S7": { type: "S", color: "#81539c", interval: 5.0, offset: 5, speed: 45, stations: [
-                { name: "Potsdam Hbf", coords: [52.3917, 13.0667] }, { name: "Wannsee", coords: [52.4211, 13.1792] }, ...SHARED_STADTBAHN, { name: "Ahrensfelde", coords: [52.5714, 13.5653] }
-            ]},
-            "S1": { type: "S", color: "#da4281", interval: 5.0, offset: 0, speed: 42, stations: [
-                { name: "Oranienburg", coords: [52.7547, 13.2472] }, { name: "Gesundbrunnen", coords: [52.5489, 13.3889] }, { name: "Friedrichstraße", coords: [52.5203, 13.3869] }, { name: "Potsdamer Platz", coords: [52.5097, 13.3758] }, { name: "Schöneberg", coords: [52.4792, 13.3517] }, { name: "Wannsee", coords: [52.4211, 13.1792] }
-            ]},
-            "S41": { type: "S", color: "#b35b2e", interval: 5.0, offset: 3, speed: 40, stations: RINGBAHN_STATIONS },
-            "S42": { type: "S", color: "#cc6633", interval: 5.0, offset: -3, speed: 40, stations: [...RINGBAHN_STATIONS].reverse() },
+            // BANLİYÖ TRENİ (S-BAHN) - Gerçek Ray Hatları (Yeşil)
+            "S5": { type: "S", color: SBAHN_COLOR, interval: 5.0, offset: 0, speed: 45, rawWaypoints: [[52.5344, 13.1975], ...REAL_STADTBAHN_WAYPOINTS, [52.5858, 13.8822]], startTerm: "Spandau", endTerm: "Strausberg Nord" },
+            "S7": { type: "S", color: SBAHN_COLOR, interval: 5.0, offset: 5, speed: 45, rawWaypoints: [[52.3917, 13.0667], [52.4211, 13.1792], ...REAL_STADTBAHN_WAYPOINTS, [52.5714, 13.5653]], startTerm: "Potsdam Hbf", endTerm: "Ahrensfelde" },
+            "S41": { type: "S", color: SBAHN_COLOR, interval: 5.0, offset: 3, speed: 40, rawWaypoints: REAL_RINGBAHN_WAYPOINTS, startTerm: "Ringbahn (İç Hat)", endTerm: "Ringbahn (Saat Yönü)" },
+            "S42": { type: "S", color: SBAHN_COLOR, interval: 5.0, offset: -3, speed: 40, rawWaypoints: [...REAL_RINGBAHN_WAYPOINTS].reverse(), startTerm: "Ringbahn (Dış Hat)", endTerm: "Ringbahn (Ters Yön)" },
 
-            // METROBUS M45
-            "M45": { type: "BUS", color: "#772390", interval: 4.5, offset: 0, speed: 24, stations: [
-                { name: "Spandau, Johannesstift", coords: [52.5597, 13.1969] },
-                { name: "Rathaus Spandau", coords: [52.5357, 13.2008] },
-                { name: "Kranichsteinstr.", coords: [52.5278, 13.2389] },
-                { name: "Schloss Charlottenburg", coords: [52.5208, 13.2956] },
-                { name: "Richard-Wagner-Platz", coords: [52.5159, 13.3074] },
-                { name: "Ernst-Reuter-Platz", coords: [52.5128, 13.3219] },
-                { name: "Zoologischer Garten", coords: [52.5074, 13.3327] }
-            ]}
+            // METROBUS - Gerçek Cadde Güzergahı (Kırmızı)
+            "M45": { type: "BUS", color: BUS_COLOR, interval: 4.5, offset: 0, speed: 25, rawWaypoints: REAL_M45_WAYPOINTS, startTerm: "Spandau, Johannesstift", endTerm: "Zoologischer Garten" }
         };
 
         // ========================================================
-        // 3. COĞRAFİ MATEMATİK VE OFSET MOTORU
+        // 3. MATEMATİK VE GEOMETRİ MOTORU
         // ========================================================
         function getDistanceMeters(c1, c2) {
             const R = 6371000;
@@ -337,7 +333,8 @@
             return result;
         }
 
-        function buildTrack(stations, subdivisions = 10, offsetMeters = 0) {
+        // Yeraltı U-Bahn için Eğri Ray Oluşturucu
+        function buildCurvedTrack(stations, subdivisions = 10, offsetMeters = 0) {
             const points = stations.map(s => s.coords);
             const rawCoords = [];
 
@@ -366,47 +363,57 @@
                 track.push({ coords: finalCoords[i], distance: total });
             }
 
-            const stationsWithDist = stations.map(st => {
-                let closest = track[0];
-                let minDist = Infinity;
-                track.forEach(pt => {
-                    const d = getDistanceMeters(pt.coords, st.coords);
-                    if (d < minDist) {
-                        minDist = d;
-                        closest = pt;
-                    }
-                });
-                return { ...st, trackDistance: closest.distance };
-            });
+            return {
+                track,
+                totalDistance: total,
+                startTerm: stations[0].name,
+                endTerm: stations[stations.length - 1].name
+            };
+        }
 
-            return { track, totalDistance: total, stations: stationsWithDist };
+        // Yeryüzü S-Bahn ve Otobüs için Doğrudan Ray/Cadde Geometrisi
+        function buildExplicitTrack(waypoints, offsetMeters = 0, startTerm = "", endTerm = "") {
+            const finalCoords = applyNormalOffset(waypoints, offsetMeters);
+            const track = [{ coords: finalCoords[0], distance: 0 }];
+            let total = 0;
+
+            for (let i = 1; i < finalCoords.length; i++) {
+                total += getDistanceMeters(finalCoords[i - 1], finalCoords[i]);
+                track.push({ coords: finalCoords[i], distance: total });
+            }
+
+            return {
+                track,
+                totalDistance: total,
+                startTerm: startTerm,
+                endTerm: endTerm
+            };
         }
 
         // ========================================================
-        // 4. EVRENSEL GERÇEK ZAMANLI ARAÇ MODELİ (U, S, OTOBÜS)
+        // 4. ARAÇ MODELİ (TIKLAMA, POPUP VE RENK YÖNETİMİ)
         // ========================================================
         class NetworkVehicle {
             constructor(id, lineKey, type, trackNetwork, color, initialDistance, direction, speedKmh = 33) {
                 this.id = id;
                 this.lineKey = lineKey;
-                this.type = type; // "U", "S", "BUS"
+                this.type = type;
                 this.network = trackNetwork;
-                this.color = color;
+                this.originalColor = color;
                 
-                // Araç tipine göre fiziksel ölçek
                 if (this.type === "BUS") {
                     this.carCount = 1;
-                    this.carriageLength = 18.0; // Körüklü otobüs
+                    this.carriageLength = 18.0;
                     this.carriageWidth = 3.2;
                     this.unitSpacing = 19.0;
                 } else if (this.type === "S") {
                     this.carCount = 6;
-                    this.carriageLength = 18.0; // S-Bahn vagonu
+                    this.carriageLength = 18.0;
                     this.carriageWidth = 3.2;
                     this.unitSpacing = 19.2;
                 } else {
                     this.carCount = 6;
-                    this.carriageLength = 15.0; // U-Bahn vagonu
+                    this.carriageLength = 15.0;
                     this.carriageWidth = 3.0;
                     this.unitSpacing = 16.2;
                 }
@@ -419,15 +426,12 @@
                 this.direction = direction;
                 this.speedMps = (speedKmh * 1000) / 3600;
 
-                // Gecikme ve Durak Durumu
-                this.delayMinutes = Math.random() < 0.22 ? Math.floor(Math.random() * 6) + 1 : 0; // %22 ihtimalle gecikme
-                this.isDwelling = false;
-                this.dwellTimer = 0;
-                this.visitedStations = new Set();
-                this.nextStation = "Belirleniyor...";
-
                 this.markers = [];
                 this.createGraphics();
+            }
+
+            getDirectionTerm() {
+                return this.direction === 1 ? this.network.endTerm : this.network.startTerm;
             }
 
             createGraphics() {
@@ -435,9 +439,9 @@
                     const icon = L.divIcon({
                         className: 'carriage-container',
                         iconSize: [0, 0],
-                        html: `<svg style="overflow: visible; pointer-events: none;">
+                        html: `<svg style="overflow: visible; pointer-events: auto; cursor: pointer;">
                                    <rect class="train-carriage" rx="2" ry="2" 
-                                         fill="${this.color}" 
+                                         fill="${this.originalColor}" 
                                          stroke="#ffffff" 
                                          stroke-width="1.2"
                                          style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));" />
@@ -445,30 +449,23 @@
                     });
                     const marker = L.marker(this.network.track[0].coords, { icon: icon }).addTo(map);
 
-                    // Baş vagona tıklanınca Bilgi Kartı (HUD) aç
-                    if (i === 0) {
-                        marker.on('click', () => {
-                            const delayHtml = this.delayMinutes === 0
-                                ? `<span class="delay-tag delay-ok">Dakik (Zamanında)</span>`
-                                : `<span class="delay-tag delay-warn">+${this.delayMinutes} dk Gecikme</span>`;
+                    // Araca tıklandığında hem hattı odakla hem de sade bilgi ekranını aç
+                    marker.on('click', (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        selectLine(this.lineKey);
 
-                            const speedReal = Math.round(this.speedMps * 3.6);
-
-                            const content = `
-                                <div class="hud-card">
-                                    <div class="hud-title">
-                                        <span style="background:${this.color}; color:#fff; padding:2px 6px; border-radius:3px;">${this.lineKey}</span>
-                                        <span>${this.id}</span>
-                                    </div>
-                                    <div><b>Tür:</b> ${this.type === 'U' ? 'U-Bahn' : this.type === 'S' ? 'S-Bahn' : 'MetroBus'}</div>
-                                    <div><b>Durum:</b> ${delayHtml}</div>
-                                    <div><b>Anlık Hız:</b> ${this.isDwelling ? '0 km/s (Durakta)' : `${speedReal} km/s`}</div>
-                                    <div><b>Sıradaki Durak:</b> ${this.nextStation}</div>
+                        const content = `
+                            <div class="simple-hud">
+                                <div class="hud-line-header" style="background:${this.originalColor};">
+                                    ${this.lineKey}
                                 </div>
-                            `;
-                            L.popup().setLatLng(marker.getLatLng()).setContent(content).openOn(map);
-                        });
-                    }
+                                <div class="hud-direction">
+                                    Yön: <b>${this.getDirectionTerm()}</b>
+                                </div>
+                            </div>
+                        `;
+                        L.popup().setLatLng(marker.getLatLng()).setContent(content).openOn(map);
+                    });
 
                     this.markers.push(marker);
                 }
@@ -495,60 +492,15 @@
                 ];
             }
 
-            updateNextStation() {
-                let candidate = null;
-                let minDistAhead = Infinity;
-
-                for (let st of this.network.stations) {
-                    const diff = (st.trackDistance - this.currentDistance) * this.direction;
-                    if (diff > 0 && diff < minDistAhead) {
-                        minDistAhead = diff;
-                        candidate = st.name;
-                    }
-                }
-                this.nextStation = candidate || "Son Durak";
-            }
-
-            checkDwell() {
-                if (this.isDwelling) return;
-                for (let st of this.network.stations) {
-                    const diff = Math.abs(this.currentDistance - st.trackDistance);
-                    if (diff < 20 && !this.visitedStations.has(st.name)) {
-                        this.isDwelling = true;
-                        this.dwellTimer = this.type === 'BUS' ? 12 : 20; // Otobüs 12sn, tren 20sn durur
-                        this.visitedStations.add(st.name);
-                        break;
-                    } else if (diff > 80) {
-                        this.visitedStations.delete(st.name);
-                    }
-                }
-            }
-
             update(deltaSeconds) {
-                this.updateNextStation();
-
-                if (this.isDwelling) {
-                    this.dwellTimer -= deltaSeconds;
-                    if (this.dwellTimer <= 0) {
-                        this.isDwelling = false;
-                    }
-                    this.render();
-                    return;
-                }
-
                 this.currentDistance += this.speedMps * deltaSeconds * this.direction;
-                this.checkDwell();
 
                 if (this.currentDistance >= this.maxDist) {
                     this.currentDistance = this.maxDist;
                     this.direction = -1;
-                    this.isDwelling = true;
-                    this.dwellTimer = 25;
                 } else if (this.currentDistance <= this.minDist) {
                     this.currentDistance = this.minDist;
                     this.direction = 1;
-                    this.isDwelling = true;
-                    this.dwellTimer = 25;
                 }
 
                 this.render();
@@ -561,6 +513,10 @@
                 
                 const pixLength = Math.max(10, this.carriageLength / metersPerPixel);
                 const pixWidth = Math.max(4.0, this.carriageWidth / metersPerPixel);
+
+                const isFaded = selectedLineKey !== null && selectedLineKey !== this.lineKey;
+                const currentColor = isFaded ? FADED_COLOR : this.originalColor;
+                const currentOpacity = isFaded ? FADED_OPACITY : 1.0;
 
                 for (let i = 0; i < this.carCount; i++) {
                     const carDist = this.currentDistance - (i * this.unitSpacing * this.direction);
@@ -577,6 +533,8 @@
                             rect.setAttribute('height', pixLength);
                             rect.setAttribute('x', -pixWidth / 2);
                             rect.setAttribute('y', -pixLength / 2);
+                            rect.setAttribute('fill', currentColor);
+                            rect.style.opacity = currentOpacity;
                             rect.style.transform = `rotate(${angle}deg)`;
                             rect.style.transformOrigin = '0 0';
                         }
@@ -586,65 +544,89 @@
         }
 
         // ========================================================
-        // 5. TÜM AĞIN KURULMASI VE ÇALIŞTIRILMASI
+        // 5. AĞIN KURULMASI VE SEÇİM MOTORU
         // ========================================================
         const fleet = [];
+        const linePolylines = {};
+        const stationMarkers = [];
         const badgesContainer = document.getElementById('badges-container');
         const renderedStations = new Set();
         const globalEpochSeconds = Date.now() / 1000;
 
-        let totalUbahn = 0;
-        let totalSbahn = 0;
-        let totalBus = 0;
-
-        let delayedLines = 0;
-        let onTimeLines = 0;
+        let countUbahn = 0;
+        let countSbahn = 0;
+        let countBus = 0;
 
         Object.keys(NETWORK_LINES).forEach(key => {
             const lineData = NETWORK_LINES[key];
-            const net = buildTrack(lineData.stations, 10, lineData.offset);
+            
+            // Geometri oluşturma (Eğri veya Açık Rota)
+            let net;
+            if (lineData.type === "U") {
+                net = buildCurvedTrack(lineData.stations, 10, lineData.offset);
+            } else {
+                net = buildExplicitTrack(lineData.rawWaypoints, lineData.offset, lineData.startTerm, lineData.endTerm);
+            }
 
-            // Başlık Rozeti
+            // Rozet Butonu
             const badge = document.createElement('span');
             badge.className = 'line-tag';
+            badge.id = `badge-${key}`;
             badge.style.backgroundColor = lineData.color;
             badge.innerText = key;
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (selectedLineKey === key) {
+                    resetSelection();
+                } else {
+                    selectLine(key);
+                }
+            });
             badgesContainer.appendChild(badge);
 
-            // Hat Polylines'ı (Otobüs kesikli, raylar düz çizgi)
-            L.polyline(net.track.map(t => t.coords), {
+            // Çizgi Katmanı
+            const poly = L.polyline(net.track.map(t => t.coords), {
                 color: lineData.color,
                 weight: lineData.type === 'BUS' ? 3.0 : 4.0,
-                opacity: 0.8,
+                opacity: 0.85,
                 dashArray: lineData.type === 'BUS' ? '6, 6' : null
             }).addTo(map);
 
-            // Duraklar
-            lineData.stations.forEach(st => {
-                const coordKey = `${st.coords[0].toFixed(4)},${st.coords[1].toFixed(4)}`;
-                if (!renderedStations.has(coordKey)) {
-                    renderedStations.add(coordKey);
-                    L.circleMarker(st.coords, {
-                        radius: lineData.type === 'BUS' ? 2.8 : 4.0,
-                        fillColor: "#ffffff",
-                        color: "#1e293b",
-                        weight: 1.8,
-                        opacity: 1,
-                        fillOpacity: 1,
-                        className: "station-node"
-                    }).bindPopup(`<b>${st.name}</b><br><small>${key} Durağı</small>`).addTo(map);
-                }
+            poly.on('click', (e) => {
+                L.DomEvent.stopPropagation(e);
+                selectLine(key);
             });
 
-            // Sefer Hesabı
+            linePolylines[key] = { polyline: poly, originalColor: lineData.color, type: lineData.type };
+
+            // U-Bahn Durakları
+            if (lineData.stations) {
+                lineData.stations.forEach(st => {
+                    const coordKey = `${st.coords[0].toFixed(4)},${st.coords[1].toFixed(4)}`;
+                    if (!renderedStations.has(coordKey)) {
+                        renderedStations.add(coordKey);
+                        const marker = L.circleMarker(st.coords, {
+                            radius: 3.8,
+                            fillColor: "#ffffff",
+                            color: "#1e293b",
+                            weight: 1.8,
+                            opacity: 1,
+                            fillOpacity: 1,
+                            className: "station-node"
+                        }).bindPopup(`<b>${st.name}</b>`).addTo(map);
+                        
+                        stationMarkers.push(marker);
+                    }
+                });
+            }
+
+            // Sefer Hesaplama
             const oneWayMinutes = (net.totalDistance / (lineData.speed * 1000 / 60));
             const trainsPerDir = Math.max(2, Math.round(oneWayMinutes / lineData.interval));
             const totalVehicles = trainsPerDir * 2;
 
             const oneWaySeconds = oneWayMinutes * 60;
             const roundTripSeconds = oneWaySeconds * 2;
-
-            let lineHasDelay = false;
 
             for (let i = 0; i < totalVehicles; i++) {
                 const staggerSeconds = (i / totalVehicles) * roundTripSeconds;
@@ -662,7 +644,7 @@
                     calculatedDistance = net.totalDistance - ((returnTime / oneWaySeconds) * net.totalDistance);
                 }
 
-                const v = new NetworkVehicle(
+                const vehicle = new NetworkVehicle(
                     `${key}-${i+1}`,
                     key,
                     lineData.type,
@@ -673,28 +655,86 @@
                     lineData.speed
                 );
 
-                if (v.delayMinutes > 0) lineHasDelay = true;
+                if (lineData.type === 'U') countUbahn++;
+                else if (lineData.type === 'S') countSbahn++;
+                else if (lineData.type === 'BUS') countBus++;
 
-                if (lineData.type === 'U') totalUbahn++;
-                else if (lineData.type === 'S') totalSbahn++;
-                else if (lineData.type === 'BUS') totalBus++;
-
-                fleet.push(v);
+                fleet.push(vehicle);
             }
-
-            if (lineHasDelay) delayedLines++;
-            else onTimeLines++;
         });
 
-        // Üst Bar İstatistiklerini Güncelle
-        document.getElementById('cnt-ubahn').innerText = totalUbahn;
-        document.getElementById('cnt-sbahn').innerText = totalSbahn;
-        document.getElementById('cnt-bus').innerText = totalBus;
-        document.getElementById('cnt-ontime').innerText = `${onTimeLines} Hat`;
-        document.getElementById('cnt-delayed').innerText = `${delayedLines} Hat`;
+        // Sayım Değerleri
+        document.getElementById('cnt-ubahn').innerText = countUbahn;
+        document.getElementById('cnt-sbahn').innerText = countSbahn;
+        document.getElementById('cnt-bus').innerText = countBus;
 
         // ========================================================
-        // 6. ANİMASYON DÖNGÜSÜ
+        // 6. ODAKLAMA / KARARTMA VE DESELECT MOTORU
+        // ========================================================
+        function selectLine(key) {
+            selectedLineKey = key;
+            document.getElementById('active-focus-info').innerText = `Odak: ${key} (Temizlemek için boşluğa tıklayın)`;
+            updateVisualStyles();
+        }
+
+        function resetSelection() {
+            selectedLineKey = null;
+            document.getElementById('active-focus-info').innerText = `Tümü Aktif (Odaklamak için hatta tıklayın)`;
+            updateVisualStyles();
+        }
+
+        // Haritada boş bir alana tıklandığında seçimi kaldır
+        map.on('click', () => {
+            resetSelection();
+        });
+
+        function updateVisualStyles() {
+            // Hat çizgilerini güncelle
+            Object.keys(linePolylines).forEach(k => {
+                const item = linePolylines[k];
+                if (selectedLineKey === null || selectedLineKey === k) {
+                    item.polyline.setStyle({
+                        color: item.originalColor,
+                        opacity: 0.85,
+                        weight: item.type === 'BUS' ? 3.5 : 4.5
+                    });
+                } else {
+                    item.polyline.setStyle({
+                        color: FADED_COLOR,
+                        opacity: FADED_OPACITY,
+                        weight: 2.0
+                    });
+                }
+            });
+
+            // Rozet stillerini güncelle
+            Object.keys(NETWORK_LINES).forEach(k => {
+                const badge = document.getElementById(`badge-${k}`);
+                if (badge) {
+                    if (selectedLineKey === null || selectedLineKey === k) {
+                        badge.style.opacity = "1";
+                        badge.style.transform = selectedLineKey === k ? "scale(1.1)" : "scale(1.0)";
+                    } else {
+                        badge.style.opacity = "0.35";
+                        badge.style.transform = "scale(1.0)";
+                    }
+                }
+            });
+
+            // Durakları güncelle
+            stationMarkers.forEach(st => {
+                st.setStyle({
+                    opacity: selectedLineKey === null ? 1.0 : 0.35,
+                    fillOpacity: selectedLineKey === null ? 1.0 : 0.35
+                });
+            });
+
+            // Araçları hemen yeniden çiz
+            fleet.forEach(v => v.render());
+        }
+
+        // ========================================================
+        // 7. ANİMASYON MOTORU
         // ========================================================
         let lastTime = performance.now();
 
@@ -715,7 +755,7 @@
             fleet.forEach(v => v.render());
         });
 
-        // PWA Butonu
+        // PWA Yükleme Desteği
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
