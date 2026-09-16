@@ -10,15 +10,12 @@
     <!-- ========================================== -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
-    
-    <!-- Android Standalone Desteği -->
     <meta name="mobile-web-app-capable" content="yes">
-    
-    <!-- iOS Safari Standalone (Tam Ekran) Desteği -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="BVG Radar">
     <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Berlin_U-Bahn_Logo.svg/192px-Berlin_U-Bahn_Logo.svg.png">
+
     <!-- Leaflet Harita Kütüphanesi CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
@@ -88,7 +85,6 @@
             background-color: #e2e8f0;
         }
 
-        /* SVG Vagon Stilleri */
         .train-carriage {
             transition: transform 0.05s linear;
         }
@@ -98,7 +94,6 @@
             filter: drop-shadow(0 0 2px rgba(0,0,0,0.35));
         }
 
-        /* Açık, Soluk ve Nötr Harita Filtresi (Ücretsiz ve Filigransız) */
         .leaflet-tile-pane {
             filter: grayscale(1) brightness(1.05) contrast(0.85);
             opacity: 0.85;
@@ -110,7 +105,7 @@
     <header>
         <div class="status-container">
             <span class="pulse-led" id="api-led"></span>
-            <span id="api-status">BVG Canlı Filo (PWA Hazır)</span>
+            <span id="api-status">BVG Canlı Filo (Zaman Senkronize)</span>
             <span id="fleet-count" style="color: #64748b; margin-left: 10px;">Hesaplanıyor...</span>
             <span id="dwell-count" style="color: #d97706; margin-left: 10px;">0 Durakta</span>
             <span id="zoom-indicator" style="color: #0284c7; margin-left: 10px;">Zoom: 12.5</span>
@@ -120,12 +115,11 @@
 
     <div id="map"></div>
 
-    <!-- Leaflet Harita Kütüphanesi JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
         // ========================================================
-        // 1. HARİTA ALTYAPISI (Ücretsiz & Açık Katman)
+        // 1. HARİTA ALTYAPISI
         // ========================================================
         const map = L.map('map', {
             zoomSnap: 0.25,
@@ -140,7 +134,7 @@
         }).addTo(map);
 
         // ========================================================
-        // 2. TÜM HATLARI VE DURAKLARI TANIMLAMA (Hepsi 6 Vagon)
+        // 2. HATLAR VE DURAKLAR
         // ========================================================
         const SHARED_U1_U3_STATIONS = [
             { name: "Wittenbergplatz", coords: [52.5019, 13.3428] },
@@ -158,7 +152,7 @@
 
         const U_LINES = {
             "U1": {
-                color: "#46963c", defaultCars: 6, intervalMinutes: 4.5, offsetMeters: 5,
+                color: "#46963c", intervalMinutes: 4.5, offsetMeters: 5,
                 stations: [
                     { name: "Uhlandstraße", coords: [52.5028, 13.3256] },
                     { name: "Kurfürstendamm", coords: [52.5040, 13.3315] },
@@ -166,7 +160,7 @@
                 ]
             },
             "U2": {
-                color: "#d63815", defaultCars: 6, intervalMinutes: 4, offsetMeters: 0,
+                color: "#d63815", intervalMinutes: 4, offsetMeters: 0,
                 stations: [
                     { name: "Ruhleben", coords: [52.5256, 13.2414] },
                     { name: "Olympia-Stadion", coords: [52.5153, 13.2500] },
@@ -200,7 +194,7 @@
                 ]
             },
             "U3": {
-                color: "#0f5a2b", defaultCars: 6, intervalMinutes: 5, offsetMeters: -5,
+                color: "#0f5a2b", intervalMinutes: 5, offsetMeters: -5,
                 stations: [
                     { name: "Krumme Lanke", coords: [52.4439, 13.2411] },
                     { name: "Onkel Toms Hütte", coords: [52.4503, 13.2536] },
@@ -219,7 +213,7 @@
                 ]
             },
             "U4": {
-                color: "#e6c700", defaultCars: 6, intervalMinutes: 6, offsetMeters: 0,
+                color: "#e6c700", intervalMinutes: 6, offsetMeters: 0,
                 stations: [
                     { name: "Nollendorfplatz", coords: [52.4994, 13.3539] },
                     { name: "Viktoria-Luise-Platz", coords: [52.4961, 13.3436] },
@@ -229,7 +223,7 @@
                 ]
             },
             "U5": {
-                color: "#734825", defaultCars: 6, intervalMinutes: 4.5, offsetMeters: 0,
+                color: "#734825", intervalMinutes: 4.5, offsetMeters: 0,
                 stations: [
                     { name: "Hauptbahnhof", coords: [52.5258, 13.3689] },
                     { name: "Bundestag", coords: [52.5200, 13.3731] },
@@ -260,7 +254,7 @@
                 ]
             },
             "U6": {
-                color: "#7e5e9f", defaultCars: 6, intervalMinutes: 4, offsetMeters: 0,
+                color: "#7e5e9f", intervalMinutes: 4, offsetMeters: 0,
                 stations: [
                     { name: "Alt-Tegel", coords: [52.5897, 13.2839] },
                     { name: "Borsigwerke", coords: [52.5819, 13.2889] },
@@ -294,7 +288,7 @@
                 ]
             },
             "U7": {
-                color: "#1184b2", defaultCars: 6, intervalMinutes: 3.75, offsetMeters: 0,
+                color: "#1184b2", intervalMinutes: 3.75, offsetMeters: 0,
                 stations: [
                     { name: "Rathaus Spandau", coords: [52.53568, 13.20077] },
                     { name: "Altstadt Spandau", coords: [52.53856, 13.20625] },
@@ -339,7 +333,7 @@
                 ]
             },
             "U8": {
-                color: "#034e7e", defaultCars: 6, intervalMinutes: 4.5, offsetMeters: 0,
+                color: "#034e7e", intervalMinutes: 4.5, offsetMeters: 0,
                 stations: [
                     { name: "Wittenau", coords: [52.5958, 13.3364] },
                     { name: "Rathaus Reinickendorf", coords: [52.5886, 13.3267] },
@@ -368,7 +362,7 @@
                 ]
             },
             "U9": {
-                color: "#e6b800", defaultCars: 6, intervalMinutes: 4, offsetMeters: 0,
+                color: "#e6b800", intervalMinutes: 4, offsetMeters: 0,
                 stations: [
                     { name: "Osloer Straße", coords: [52.55685, 13.37345] },
                     { name: "Nauener Platz", coords: [52.55182, 13.36625] },
@@ -491,7 +485,7 @@
         // 4. BEYAZ KONTURLU KAPSÜL & 6 VAGONLU LOD MOTORU
         // ========================================================
         class AdvancedLODTrain {
-            constructor(id, lineKey, trackNetwork, color, carCount, initialDistance = 0, direction = 1) {
+            constructor(id, lineKey, trackNetwork, color, initialDistance, direction) {
                 this.id = id;
                 this.lineKey = lineKey;
                 this.network = trackNetwork;
@@ -505,6 +499,8 @@
 
                 this.minDist = this.totalTrainLength;
                 this.maxDist = this.network.totalDistance;
+
+                // Zaman damgasına göre gelen mesafeyi sınırla
                 this.currentDistance = Math.max(this.minDist, Math.min(initialDistance, this.maxDist));
                 this.direction = direction;
                 this.speedMps = (33 * 1000) / 3600; // 33 km/s
@@ -513,11 +509,9 @@
                 this.dwellTimer = 0;
                 this.visitedStations = new Set();
 
-                // 1) Zoom-In Modu: 6 Ayrı Vagon Marker'ı
                 this.markers = [];
                 this.createCarriages();
 
-                // 2) Zoom-Out Modu: Beyaz Konturlu Çift Katman Kapsül
                 this.capsuleBorder = L.polyline([], {
                     color: '#ffffff',
                     weight: 8,
@@ -533,6 +527,9 @@
                     lineCap: 'round',
                     lineJoin: 'round'
                 }).addTo(map);
+
+                // İlk kareyi hemen çiz
+                this.render();
             }
 
             createCarriages() {
@@ -639,7 +636,6 @@
                 const headDist = this.currentDistance;
                 const tailDist = headDist - (this.totalTrainLength * this.direction);
 
-                // Eşik seviyesi 15.25: Bu seviyeye kadar beyaz konturlu kapsül olarak büyür
                 if (zoom >= 15.25) {
                     this.capsuleBorder.setStyle({ opacity: 0 });
                     this.capsuleCore.setStyle({ opacity: 0 });
@@ -695,11 +691,14 @@
         }
 
         // ========================================================
-        // 5. HATLARIN ÇİZİLMESİ VE FİLONUN BAŞLATILMASI
+        // 5. HATLARIN VE DİNAMİK SAATE GÖRE FİLONUN BAŞLATILMASI
         // ========================================================
         const fleet = [];
         const badgesContainer = document.getElementById('badges-container');
         const renderedStations = new Set();
+
+        // Şu anki gerçek zaman damgası (Saniye cinsinden)
+        const globalEpochSeconds = Date.now() / 1000;
 
         Object.keys(U_LINES).forEach(key => {
             const lineData = U_LINES[key];
@@ -711,14 +710,12 @@
             badge.innerText = key;
             badgesContainer.appendChild(badge);
 
-            // Canlı ray çizgileri (%85 opaklık, 4px kalınlık)
             L.polyline(net.track.map(t => t.coords), {
                 color: lineData.color,
                 weight: 4.0,
                 opacity: 0.85
             }).addTo(map);
 
-            // İstasyon LED'leri
             lineData.stations.forEach(st => {
                 const coordKey = `${st.coords[0].toFixed(4)},${st.coords[1].toFixed(4)}`;
                 if (!renderedStations.has(coordKey)) {
@@ -735,35 +732,30 @@
                 }
             });
 
-            // Sefer sıklığına göre tren dizilimi
+            // Sefer sıklığı ve gerçek zamanlı konum hesaplama
             const oneWayMinutes = (net.totalDistance / (33 * 1000 / 60));
             const trainsPerDir = Math.max(2, Math.round(oneWayMinutes / lineData.intervalMinutes));
             const totalTrains = trainsPerDir * 2;
 
-            // Trenlerin günün saatine göre dinamik konumlanması (Sürekli Canlı Zaman)
-            const currentTimeSeconds = (Date.now() / 1000); // Milisaniyeyi saniyeye çevir
-            const oneWaySeconds = oneWayMinutes * 60;       // Tek yön süresi (saniye)
-            const roundTripSeconds = oneWaySeconds * 2;     // Gidiş-dönüş tam tur süresi
+            const oneWaySeconds = oneWayMinutes * 60;
+            const roundTripSeconds = oneWaySeconds * 2;
 
             for (let i = 0; i < totalTrains; i++) {
-                // Her trenin sefer aralığına göre zaman kaydırması
-                const trainStaggerSeconds = (i / totalTrains) * roundTripSeconds;
-                
-                // Günün saniyesine trenin aralığını ekleyip tam tur döngüsüne oturtuyoruz
-                const elapsedInCycle = (currentTimeSeconds + trainStaggerSeconds) % roundTripSeconds;
+                // Trenleri hatta eşit aralıklarla dağıtan zaman ofseti
+                const staggerSeconds = (i / totalTrains) * roundTripSeconds;
+                // Gerçek saat + aralık ofseti -> tam tur döngüsünde anlık konum
+                const timeInCycle = (globalEpochSeconds + staggerSeconds) % roundTripSeconds;
 
                 let isForward = true;
-                let dynamicDistance = 0;
+                let calculatedDistance = 0;
 
-                if (elapsedInCycle < oneWaySeconds) {
-                    // Gidiş yönü (0 -> Maksimum Mesafe)
+                if (timeInCycle < oneWaySeconds) {
                     isForward = true;
-                    dynamicDistance = (elapsedInCycle / oneWaySeconds) * net.totalDistance;
+                    calculatedDistance = (timeInCycle / oneWaySeconds) * net.totalDistance;
                 } else {
-                    // Dönüş yönü (Maksimum Mesafe -> 0)
                     isForward = false;
-                    const returnElapsed = elapsedInCycle - oneWaySeconds;
-                    dynamicDistance = net.totalDistance - ((returnElapsed / oneWaySeconds) * net.totalDistance);
+                    const returnTime = timeInCycle - oneWaySeconds;
+                    calculatedDistance = net.totalDistance - ((returnTime / oneWaySeconds) * net.totalDistance);
                 }
 
                 fleet.push(new AdvancedLODTrain(
@@ -771,8 +763,7 @@
                     key,
                     net,
                     lineData.color,
-                    lineData.defaultCars,
-                    dynamicDistance,
+                    calculatedDistance,
                     isForward ? 1 : -1
                 ));
             }
@@ -814,8 +805,6 @@
         // 7. PWA VE OTOMATİK YÜKLEME MOTORU
         // ========================================================
         let deferredPrompt;
-
-        // Üst bara "Uygulamayı Yükle" butonu ekle
         const headerContainer = document.querySelector('.status-container');
         const installBtn = document.createElement('button');
         installBtn.innerText = "📲 Uygulamayı Yükle";
@@ -823,7 +812,6 @@
         headerContainer.appendChild(installBtn);
 
         window.addEventListener('beforeinstallprompt', (e) => {
-            // Chrome'un varsayılan mini çubuğunu engelle, butonumuzu göster
             e.preventDefault();
             deferredPrompt = e;
             installBtn.style.display = 'inline-block';
@@ -847,3 +835,6 @@
                     .catch(err => console.log("PWA Hatası:", err));
             });
         }
+    </script>
+</body>
+</html>
