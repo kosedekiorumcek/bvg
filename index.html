@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Berlin Canlı Ulaşım Radarı</title>
+    <title>Berlin U-Bahn Canlı Radar Ağı</title>
     
+    <!-- ========================================== -->
+    <!-- MOBİL UYGULAMA (PWA) VE APPLE META ETİKETLERİ -->
+    <!-- ========================================== -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
     <meta name="mobile-web-app-capable" content="yes">
@@ -13,137 +16,99 @@
     <meta name="apple-mobile-web-app-title" content="BVG Radar">
     <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Berlin_U-Bahn_Logo.svg/192px-Berlin_U-Bahn_Logo.svg.png">
 
+    <!-- Leaflet Harita Kütüphanesi CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
         * { box-sizing: border-box; }
-        html, body {
+        body {
             margin: 0;
             padding: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #f8fafc;
+            background-color: #e9ecef;
             color: #1e293b;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             flex-direction: column;
+            height: 100vh;
             overflow: hidden;
             -webkit-tap-highlight-color: transparent;
         }
 
         header {
-            padding: 8px 14px;
+            padding: 8px 16px;
             background: #ffffff;
             display: flex;
-            flex-direction: column;
-            border-bottom: 1px solid #cbd5e1;
-            z-index: 1000;
-            gap: 6px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-        }
-
-        .stats-bar {
-            display: flex;
-            align-items: center;
             justify-content: space-between;
-            font-size: 12px;
-            font-weight: 600;
+            align-items: center;
+            border-bottom: 2px solid #cbd5e1;
+            z-index: 1000;
             flex-wrap: wrap;
             gap: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
 
-        .stat-item {
+        .status-container {
             display: flex;
             align-items: center;
-            gap: 5px;
-            background: #f1f5f9;
-            padding: 4px 8px;
-            border-radius: 6px;
-            border: 1px solid #e2e8f0;
+            gap: 10px;
+            font-size: 13px;
+            font-weight: 500;
         }
 
-        .stat-val {
-            font-weight: 700;
-            color: #0f172a;
+        .pulse-led {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #10b981;
+            box-shadow: 0 0 6px #10b981;
+            display: inline-block;
         }
 
         .badges-wrapper {
             display: flex;
             gap: 5px;
             flex-wrap: wrap;
-            max-height: 52px;
-            overflow-y: auto;
         }
 
         .line-tag {
-            padding: 3px 8px;
+            padding: 2px 7px;
             border-radius: 4px;
             font-size: 11px;
             font-weight: bold;
             color: #ffffff;
-            cursor: pointer;
-            user-select: none;
-            transition: opacity 0.2s, transform 0.1s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.25);
         }
-        .line-tag:active { transform: scale(0.95); }
 
         #map {
             flex: 1;
             width: 100%;
-            height: 100%;
             background-color: #e2e8f0;
         }
 
         .train-carriage {
-            transition: fill 0.25s ease, opacity 0.25s ease;
+            transition: transform 0.05s linear;
         }
 
         .station-node {
             cursor: pointer;
-            transition: fill 0.25s ease, opacity 0.25s ease;
+            filter: drop-shadow(0 0 2px rgba(0,0,0,0.35));
         }
 
-        .simple-hud {
-            font-size: 13px;
-            line-height: 1.4;
-            padding: 2px 4px;
-        }
-        .hud-line-header {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            color: #ffffff;
-            font-weight: 800;
-            font-size: 13px;
-            margin-bottom: 6px;
-        }
-        .hud-direction {
-            font-size: 13px;
-            color: #0f172a;
-            font-weight: 600;
+        .leaflet-tile-pane {
+            filter: grayscale(1) brightness(1.05) contrast(0.85);
+            opacity: 0.85;
         }
     </style>
 </head>
 <body>
 
     <header>
-        <div class="stats-bar">
-            <div class="stat-item">
-                <span>🚇 Metro (U):</span>
-                <span class="stat-val" id="cnt-ubahn">0</span>
-            </div>
-            <div class="stat-item">
-                <span>🚆 Banliyö (S):</span>
-                <span class="stat-val" id="cnt-sbahn">0</span>
-            </div>
-            <div class="stat-item">
-                <span>🚌 Otobüs (M):</span>
-                <span class="stat-val" id="cnt-bus">0</span>
-            </div>
-            <div class="stat-item" id="active-focus-info" style="color: #64748b;">
-                Tümü Aktif (Odaklamak için hatta tıklayın)
-            </div>
-            <div id="install-slot"></div>
+        <div class="status-container">
+            <span class="pulse-led" id="api-led"></span>
+            <span id="api-status">BVG Canlı Filo (Zaman Senkronize)</span>
+            <span id="fleet-count" style="color: #64748b; margin-left: 10px;">Hesaplanıyor...</span>
+            <span id="dwell-count" style="color: #d97706; margin-left: 10px;">0 Durakta</span>
+            <span id="zoom-indicator" style="color: #0284c7; margin-left: 10px;">Zoom: 12.5</span>
         </div>
         <div class="badges-wrapper" id="badges-container"></div>
     </header>
@@ -154,31 +119,24 @@
 
     <script>
         // ========================================================
-        // 1. HARİTA ALTYAPISI (AÇIK KAYNAK OSM)
+        // 1. HARİTA ALTYAPISI
         // ========================================================
         const map = L.map('map', {
             zoomSnap: 0.25,
             zoomDelta: 0.5
-        }).setView([52.5150, 13.3500], 12.0);
+        }).setView([52.5050, 13.3600], 12.5);
 
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '&copy; OpenStreetMap contributors'
+            subdomains: ['a', 'b'],
+            attribution: '&copy; OpenStreetMap contributors',
+            referrerPolicy: 'no-referrer'
         }).addTo(map);
 
-        let selectedLineKey = null;
-        const FADED_COLOR = "#94a3b8";
-        const FADED_OPACITY = 0.20;
-
-        const SBAHN_COLOR = "#00864e"; // Resmi S-Bahn Yeşili
-        const BUS_COLOR = "#b91c1c";   // Resmi BVG Kırmızısı
-
         // ========================================================
-        // 2. ORİJİNAL VE EKSİKSİZ DURAK VERİLERİ
+        // 2. HATLAR VE DURAKLAR
         // ========================================================
-
-        // U1 / U3 Ortak İstasyonları
-        const SHARED_U1_U3 = [
+        const SHARED_U1_U3_STATIONS = [
             { name: "Wittenbergplatz", coords: [52.5019, 13.3428] },
             { name: "Nollendorfplatz", coords: [52.4994, 13.3539] },
             { name: "Kurfürstenstraße", coords: [52.5000, 13.3619] },
@@ -192,157 +150,244 @@
             { name: "Warschauer Straße", coords: [52.5058, 13.4494] }
         ];
 
-        // U7: Rathaus Spandau -> Rudow (Eksiksiz 40 Durak - Orijinal Koordinatlar)
-        const U7_FULL_STATIONS = [
-            { name: "Rathaus Spandau", coords: [52.5358, 13.2003] },
-            { name: "Altstadt Spandau", coords: [52.5385, 13.2057] },
-            { name: "Zitadelle", coords: [52.5378, 13.2178] },
-            { name: "Haselhorst", coords: [52.5392, 13.2325] },
-            { name: "Paulsternstraße", coords: [52.5372, 13.2472] },
-            { name: "Rohrdamm", coords: [52.5361, 13.2625] },
-            { name: "Siemensdamm", coords: [52.5369, 13.2736] },
-            { name: "Halemweg", coords: [52.5358, 13.2861] },
-            { name: "Jakob-Kaiser-Platz", coords: [52.5342, 13.2936] },
-            { name: "Jungfernheide", coords: [52.5303, 13.3000] },
-            { name: "Mierendorffplatz", coords: [52.5264, 13.3050] },
-            { name: "Richard-Wagner-Platz", coords: [52.5158, 13.3072] },
-            { name: "Bismarckstraße", coords: [52.5117, 13.3056] },
-            { name: "Wilmersdorfer Straße", coords: [52.5064, 13.3069] },
-            { name: "Adenauerplatz", coords: [52.5000, 13.3072] },
-            { name: "Konstanzer Straße", coords: [52.4939, 13.3097] },
-            { name: "Fehrbelliner Platz", coords: [52.4900, 13.3142] },
-            { name: "Blissestraße", coords: [52.4864, 13.3214] },
-            { name: "Berliner Straße", coords: [52.4872, 13.3311] },
-            { name: "Bayerischer Platz", coords: [52.4889, 13.3400] },
-            { name: "Eisenacher Straße", coords: [52.4894, 13.3517] },
-            { name: "Kleistpark", coords: [52.4911, 13.3600] },
-            { name: "Yorckstraße", coords: [52.4925, 13.3711] },
-            { name: "Möckernbrücke", coords: [52.4990, 13.3830] },
-            { name: "Mehringdamm", coords: [52.4944, 13.3889] },
-            { name: "Gneisenaustraße", coords: [52.4914, 13.3961] },
-            { name: "Südstern", coords: [52.4894, 13.4078] },
-            { name: "Hermannplatz", coords: [52.4872, 13.4247] },
-            { name: "Rathaus Neukölln", coords: [52.4814, 13.4339] },
-            { name: "Karl-Marx-Straße", coords: [52.4764, 13.4394] },
-            { name: "Neukölln", coords: [52.4697, 13.4428] },
-            { name: "Grenzallee", coords: [52.4633, 13.4447] },
-            { name: "Blaschkoallee", coords: [52.4519, 13.4503] },
-            { name: "Parchimer Allee", coords: [52.4444, 13.4497] },
-            { name: "Britz-Süd", coords: [52.4372, 13.4481] },
-            { name: "Johannisthaler Chaussee", coords: [52.4289, 13.4536] },
-            { name: "Lipschitzallee", coords: [52.4231, 13.4633] },
-            { name: "Wutzkyallee", coords: [52.4158, 13.4750] },
-            { name: "Zwickauer Damm", coords: [52.4042, 13.4839] },
-            { name: "Rudow", coords: [52.3958, 13.4981] }
-        ];
-
-        // U9: Osloer Straße -> Rathaus Steglitz (Eksiksiz 18 Durak - Orijinal Koordinatlar)
-        const U9_FULL_STATIONS = [
-            { name: "Osloer Straße", coords: [52.5567, 13.3733] },
-            { name: "Nauener Platz", coords: [52.5517, 13.3661] },
-            { name: "Leopoldplatz", coords: [52.5467, 13.3592] },
-            { name: "Amrumer Straße", coords: [52.5422, 13.3503] },
-            { name: "Westhafen", coords: [52.5361, 13.3439] },
-            { name: "Birkenstraße", coords: [52.5317, 13.3414] },
-            { name: "Turmstraße", coords: [52.5261, 13.3422] },
-            { name: "Hansaplatz", coords: [52.5178, 13.3425] },
-            { name: "Zoologischer Garten", coords: [52.5072, 13.3325] },
-            { name: "Kurfürstendamm", coords: [52.5039, 13.3314] },
-            { name: "Spichernstraße", coords: [52.4964, 13.3308] },
-            { name: "Güntzelstraße", coords: [52.4917, 13.3311] },
-            { name: "Berliner Straße", coords: [52.4872, 13.3311] },
-            { name: "Bundesplatz", coords: [52.4778, 13.3289] },
-            { name: "Friedrich-Wilhelm-Platz", coords: [52.4722, 13.3283] },
-            { name: "Walther-Schreiber-Platz", coords: [52.4697, 13.3283] },
-            { name: "Schloßstraße", coords: [52.4614, 13.3244] },
-            { name: "Rathaus Steglitz", coords: [52.4561, 13.3208] }
-        ];
-
-        // S-Bahn Doğu-Batı Ana İstasyonları (Ray Aksı)
-        const STADTBAHN_STATIONS = [
-            { name: "Westkreuz", coords: [52.5011, 13.2836] },
-            { name: "Charlottenburg", coords: [52.5047, 13.3033] },
-            { name: "Savignyplatz", coords: [52.5053, 13.3197] },
-            { name: "Zoologischer Garten", coords: [52.5073, 13.3326] },
-            { name: "Tiergarten", coords: [52.5139, 13.3364] },
-            { name: "Bellevue", coords: [52.5203, 13.3478] },
-            { name: "Hauptbahnhof", coords: [52.5258, 13.3689] },
-            { name: "Friedrichstraße", coords: [52.5203, 13.3869] },
-            { name: "Hackescher Markt", coords: [52.5225, 13.4022] },
-            { name: "Alexanderplatz", coords: [52.5214, 13.4111] },
-            { name: "Jannowitzbrücke", coords: [52.5153, 13.4181] },
-            { name: "Ostbahnhof", coords: [52.5106, 13.4347] },
-            { name: "Warschauer Straße", coords: [52.5058, 13.4494] },
-            { name: "Ostkreuz", coords: [52.5031, 13.4692] }
-        ];
-
-        // S-Bahn Ringbahn Resmi İstasyon Dizilimi
-        const RINGBAHN_STATIONS = [
-            { name: "Südkreuz", coords: [52.4753, 13.3653] },
-            { name: "Schöneberg", coords: [52.4792, 13.3517] },
-            { name: "Innsbrucker Platz", coords: [52.4786, 13.3433] },
-            { name: "Bundesplatz", coords: [52.4779, 13.3291] },
-            { name: "Heidelberger Platz", coords: [52.4800, 13.3117] },
-            { name: "Halensee", coords: [52.4961, 13.2889] },
-            { name: "Westkreuz", coords: [52.5011, 13.2836] },
-            { name: "Messe Nord/ICC", coords: [52.5078, 13.2817] },
-            { name: "Westend", coords: [52.5181, 13.2847] },
-            { name: "Jungfernheide", coords: [52.5303, 13.2997] },
-            { name: "Beusselstraße", coords: [52.5344, 13.3289] },
-            { name: "Westhafen", coords: [52.5362, 13.3441] },
-            { name: "Wedding", coords: [52.5422, 13.3664] },
-            { name: "Gesundbrunnen", coords: [52.5489, 13.3889] },
-            { name: "Schönhauser Allee", coords: [52.5494, 13.4161] },
-            { name: "Prenzlauer Allee", coords: [52.5442, 13.4278] },
-            { name: "Greifswalder Straße", coords: [52.5394, 13.4389] },
-            { name: "Landsberger Allee", coords: [52.5289, 13.4556] },
-            { name: "Frankfurter Allee", coords: [52.5136, 13.4750] },
-            { name: "Ostkreuz", coords: [52.5031, 13.4692] },
-            { name: "Treptower Park", coords: [52.4936, 13.4614] },
-            { name: "Sonnenallee", coords: [52.4736, 13.4564] },
-            { name: "Neukölln", coords: [52.4698, 13.4429] },
-            { name: "Hermannstraße", coords: [52.4678, 13.4314] },
-            { name: "Tempelhof", coords: [52.4708, 13.3856] },
-            { name: "Südkreuz", coords: [52.4753, 13.3653] }
-        ];
-
-        // M45 Otobüs Ana Durakları (Doğru Cadde Aksı)
-        const M45_STATIONS = [
-            { name: "Spandau, Johannesstift", coords: [52.5606, 13.1952] },
-            { name: "Rathaus Spandau", coords: [52.5358, 13.2003] },
-            { name: "Kranichsteinstr.", coords: [52.5283, 13.2392] },
-            { name: "Schloss Charlottenburg", coords: [52.5210, 13.2958] },
-            { name: "Richard-Wagner-Platz", coords: [52.5158, 13.3072] },
-            { name: "Ernst-Reuter-Platz", coords: [52.5128, 13.3219] },
-            { name: "Zoologischer Garten", coords: [52.5073, 13.3326] }
-        ];
-
-        const NETWORK_LINES = {
-            // METRO (U-BAHN) - Orijinal Değişmeyen Spline
-            "U1": { type: "U", color: "#46963c", interval: 4.5, speed: 32, isLoop: false, stations: [{ name: "Uhlandstraße", coords: [52.5028, 13.3256] }, { name: "Kurfürstendamm", coords: [52.5040, 13.3315] }, ...SHARED_U1_U3] },
-            "U2": { type: "U", color: "#d63815", interval: 4.0, speed: 32, isLoop: false, stations: [
-                { name: "Ruhleben", coords: [52.5256, 13.2414] }, { name: "Theodor-Heuss-Platz", coords: [52.5108, 13.2731] }, { name: "Bismarckstraße", coords: [52.5117, 13.3056] }, { name: "Zoologischer Garten", coords: [52.5072, 13.3325] }, { name: "Wittenbergplatz", coords: [52.5019, 13.3428] }, { name: "Potsdamer Platz", coords: [52.5097, 13.3758] }, { name: "Alexanderplatz", coords: [52.5214, 13.4111] }, { name: "Pankow", coords: [52.5672, 13.4114] }
-            ]},
-            "U3": { type: "U", color: "#0f5a2b", interval: 5.0, speed: 32, isLoop: false, stations: [
-                { name: "Krumme Lanke", coords: [52.4439, 13.2411] }, { name: "Dahlem-Dorf", coords: [52.4578, 13.2894] }, { name: "Fehrbelliner Platz", coords: [52.4900, 13.3142] }, { name: "Spichernstraße", coords: [52.4964, 13.3308] }, ...SHARED_U1_U3
-            ]},
-            "U7": { type: "U", color: "#1184b2", interval: 3.8, speed: 34, isLoop: false, stations: U7_FULL_STATIONS },
-            "U9": { type: "U", color: "#e6b800", interval: 4.0, speed: 33, isLoop: false, stations: U9_FULL_STATIONS },
-
-            // S-BAHN (Temiz Ray Çizgileri - Yeşil)
-            "S5": { type: "S", color: SBAHN_COLOR, interval: 5.0, speed: 45, isLoop: false, stations: [{ name: "Spandau", coords: [52.5344, 13.1975] }, ...STADTBAHN_STATIONS, { name: "Strausberg Nord", coords: [52.5858, 13.8822] }] },
-            "S7": { type: "S", color: SBAHN_COLOR, interval: 5.0, speed: 45, isLoop: false, stations: [{ name: "Potsdam Hbf", coords: [52.3917, 13.0667] }, { name: "Wannsee", coords: [52.4211, 13.1792] }, ...STADTBAHN_STATIONS, { name: "Ahrensfelde", coords: [52.5714, 13.5653] }] },
-            
-            // Ringbahn: Tek Yönlü Dairesel
-            "S41": { type: "S", color: SBAHN_COLOR, interval: 4.5, speed: 40, isLoop: true, stations: RINGBAHN_STATIONS, startTerm: "Ringbahn ↻", endTerm: "S41 (Saat Yönü)" },
-            "S42": { type: "S", color: SBAHN_COLOR, interval: 4.5, speed: 40, isLoop: true, stations: [...RINGBAHN_STATIONS].reverse(), startTerm: "Ringbahn ↺", endTerm: "S42 (Saat Tersi)" },
-
-            // METROBUS M45 (Temiz Cadde Aksı - Kırmızı)
-            "M45": { type: "BUS", color: BUS_COLOR, interval: 4.5, speed: 25, isLoop: false, stations: M45_STATIONS }
+        const U_LINES = {
+            "U1": {
+                color: "#46963c", intervalMinutes: 4.5, offsetMeters: 5,
+                stations: [
+                    { name: "Uhlandstraße", coords: [52.5028, 13.3256] },
+                    { name: "Kurfürstendamm", coords: [52.5040, 13.3315] },
+                    ...SHARED_U1_U3_STATIONS
+                ]
+            },
+            "U2": {
+                color: "#d63815", intervalMinutes: 4, offsetMeters: 0,
+                stations: [
+                    { name: "Ruhleben", coords: [52.5256, 13.2414] },
+                    { name: "Olympia-Stadion", coords: [52.5153, 13.2500] },
+                    { name: "Neu-Westend", coords: [52.5156, 13.2611] },
+                    { name: "Theodor-Heuss-Platz", coords: [52.5108, 13.2731] },
+                    { name: "Kaiserdamm", coords: [52.5100, 13.2822] },
+                    { name: "Sophie-Charlotte-Platz", coords: [52.5111, 13.2958] },
+                    { name: "Bismarckstraße", coords: [52.5121, 13.3057] },
+                    { name: "Deutsche Oper", coords: [52.5119, 13.3106] },
+                    { name: "Ernst-Reuter-Platz", coords: [52.5128, 13.3219] },
+                    { name: "Zoologischer Garten", coords: [52.5073, 13.3326] },
+                    { name: "Wittenbergplatz", coords: [52.5019, 13.3428] },
+                    { name: "Nollendorfplatz", coords: [52.4994, 13.3539] },
+                    { name: "Bülowstraße", coords: [52.4972, 13.3639] },
+                    { name: "Gleisdreieck", coords: [52.4997, 13.3739] },
+                    { name: "Mendelssohn-Bartholdy-Park", coords: [52.5039, 13.3747] },
+                    { name: "Potsdamer Platz", coords: [52.5097, 13.3758] },
+                    { name: "Mohrenstraße", coords: [52.5117, 13.3844] },
+                    { name: "Stadtmitte", coords: [52.5122, 13.3892] },
+                    { name: "Hausvogteiplatz", coords: [52.5136, 13.3967] },
+                    { name: "Spittelmarkt", coords: [52.5119, 13.4039] },
+                    { name: "Märkisches Museum", coords: [52.5125, 13.4094] },
+                    { name: "Klosterstraße", coords: [52.5164, 13.4122] },
+                    { name: "Alexanderplatz", coords: [52.5214, 13.4111] },
+                    { name: "Rosa-Luxemburg-Platz", coords: [52.5281, 13.4103] },
+                    { name: "Senefelderplatz", coords: [52.5328, 13.4128] },
+                    { name: "Eberswalder Straße", coords: [52.5414, 13.4122] },
+                    { name: "Schönhauser Allee", coords: [52.5494, 13.4161] },
+                    { name: "Vinetastraße", coords: [52.5594, 13.4144] },
+                    { name: "Pankow", coords: [52.5672, 13.4114] }
+                ]
+            },
+            "U3": {
+                color: "#0f5a2b", intervalMinutes: 5, offsetMeters: -5,
+                stations: [
+                    { name: "Krumme Lanke", coords: [52.4439, 13.2411] },
+                    { name: "Onkel Toms Hütte", coords: [52.4503, 13.2536] },
+                    { name: "Oskar-Helene-Heim", coords: [52.4506, 13.2694] },
+                    { name: "Freie Universität", coords: [52.4514, 13.2828] },
+                    { name: "Dahlem-Dorf", coords: [52.4578, 13.2894] },
+                    { name: "Podbielskiallee", coords: [52.4642, 13.2964] },
+                    { name: "Breitenbachplatz", coords: [52.4672, 13.3083] },
+                    { name: "Rüdesheimer Platz", coords: [52.4736, 13.3142] },
+                    { name: "Heidelberger Platz", coords: [52.4800, 13.3117] },
+                    { name: "Fehrbelliner Platz", coords: [52.4901, 13.3143] },
+                    { name: "Hohenzollernplatz", coords: [52.4939, 13.3247] },
+                    { name: "Spichernstraße", coords: [52.4965, 13.3309] },
+                    { name: "Augsburger Straße", coords: [52.5003, 13.3364] },
+                    ...SHARED_U1_U3_STATIONS
+                ]
+            },
+            "U4": {
+                color: "#e6c700", intervalMinutes: 6, offsetMeters: 0,
+                stations: [
+                    { name: "Nollendorfplatz", coords: [52.4994, 13.3539] },
+                    { name: "Viktoria-Luise-Platz", coords: [52.4961, 13.3436] },
+                    { name: "Bayerischer Platz", coords: [52.4889, 13.3401] },
+                    { name: "Rathaus Schöneberg", coords: [52.4831, 13.3417] },
+                    { name: "Innsbrucker Platz", coords: [52.4786, 13.3433] }
+                ]
+            },
+            "U5": {
+                color: "#734825", intervalMinutes: 4.5, offsetMeters: 0,
+                stations: [
+                    { name: "Hauptbahnhof", coords: [52.5258, 13.3689] },
+                    { name: "Bundestag", coords: [52.5200, 13.3731] },
+                    { name: "Brandenburger Tor", coords: [52.5164, 13.3808] },
+                    { name: "Unter den Linden", coords: [52.5169, 13.3889] },
+                    { name: "Museumsinsel", coords: [52.5172, 13.3997] },
+                    { name: "Rotes Rathaus", coords: [52.5189, 13.4072] },
+                    { name: "Alexanderplatz", coords: [52.5214, 13.4111] },
+                    { name: "Schillingstraße", coords: [52.5208, 13.4217] },
+                    { name: "Strausberger Platz", coords: [52.5181, 13.4319] },
+                    { name: "Weberwiese", coords: [52.5158, 13.4444] },
+                    { name: "Frankfurter Tor", coords: [52.5158, 13.4539] },
+                    { name: "Samariterstraße", coords: [52.5150, 13.4650] },
+                    { name: "Frankfurter Allee", coords: [52.5136, 13.4750] },
+                    { name: "Magdalenenstraße", coords: [52.5125, 13.4864] },
+                    { name: "Lichtenberg", coords: [52.5103, 13.4975] },
+                    { name: "Friedrichsfelde", coords: [52.5058, 13.5133] },
+                    { name: "Tierpark", coords: [52.4967, 13.5228] },
+                    { name: "Biesdorf-Süd", coords: [52.4900, 13.5433] },
+                    { name: "Elsterwerdaer Platz", coords: [52.5042, 13.5606] },
+                    { name: "Wuhletal", coords: [52.5125, 13.5750] },
+                    { name: "Kaulsdorf-Nord", coords: [52.5211, 13.5886] },
+                    { name: "Kienberg", coords: [52.5297, 13.5911] },
+                    { name: "Cottbusser Platz", coords: [52.5339, 13.5978] },
+                    { name: "Hellersdorf", coords: [52.5369, 13.6061] },
+                    { name: "Louis-Lewin-Straße", coords: [52.5394, 13.6186] },
+                    { name: "Hönow", coords: [52.5447, 13.6339] }
+                ]
+            },
+            "U6": {
+                color: "#7e5e9f", intervalMinutes: 4, offsetMeters: 0,
+                stations: [
+                    { name: "Alt-Tegel", coords: [52.5897, 13.2839] },
+                    { name: "Borsigwerke", coords: [52.5819, 13.2889] },
+                    { name: "Holzhauser Straße", coords: [52.5761, 13.2953] },
+                    { name: "Otisstraße", coords: [52.5708, 13.3025] },
+                    { name: "Scharnweberstraße", coords: [52.5667, 13.3136] },
+                    { name: "Kurt-Schumacher-Platz", coords: [52.5633, 13.3278] },
+                    { name: "Afrikanische Straße", coords: [52.5544, 13.3347] },
+                    { name: "Rehberge", coords: [52.5481, 13.3422] },
+                    { name: "Seestraße", coords: [52.5428, 13.3522] },
+                    { name: "Leopoldplatz", coords: [52.5468, 13.3593] },
+                    { name: "Wedding", coords: [52.5422, 13.3664] },
+                    { name: "Reinickendorfer Straße", coords: [52.5394, 13.3706] },
+                    { name: "Schwartzkopffstraße", coords: [52.5353, 13.3772] },
+                    { name: "Naturkundemuseum", coords: [52.5306, 13.3828] },
+                    { name: "Oranienburger Tor", coords: [52.5256, 13.3881] },
+                    { name: "Friedrichstraße", coords: [52.5203, 13.3869] },
+                    { name: "Unter den Linden", coords: [52.5169, 13.3889] },
+                    { name: "Stadtmitte", coords: [52.5122, 13.3892] },
+                    { name: "Kochstraße", coords: [52.5058, 13.3908] },
+                    { name: "Hallesches Tor", coords: [52.4978, 13.3911] },
+                    { name: "Mehringdamm", coords: [52.4935, 13.3881] },
+                    { name: "Platz der Luftbrücke", coords: [52.4861, 13.3858] },
+                    { name: "Paradestraße", coords: [52.4781, 13.3869] },
+                    { name: "Tempelhof", coords: [52.4708, 13.3856] },
+                    { name: "Alt-Tempelhof", coords: [52.4650, 13.3858] },
+                    { name: "Kaiserin-Augusta-Straße", coords: [52.4589, 13.3858] },
+                    { name: "Ullsteinstraße", coords: [52.4519, 13.3856] },
+                    { name: "Westphalweg", coords: [52.4456, 13.3856] },
+                    { name: "Alt-Mariendorf", coords: [52.4397, 13.3872] }
+                ]
+            },
+            "U7": {
+                color: "#1184b2", intervalMinutes: 3.75, offsetMeters: 0,
+                stations: [
+                    { name: "Rathaus Spandau", coords: [52.53568, 13.20077] },
+                    { name: "Altstadt Spandau", coords: [52.53856, 13.20625] },
+                    { name: "Zitadelle", coords: [52.53782, 13.21815] },
+                    { name: "Haselhorst", coords: [52.53932, 13.23275] },
+                    { name: "Paulsternstraße", coords: [52.53723, 13.24765] },
+                    { name: "Rohrdamm", coords: [52.53612, 13.26285] },
+                    { name: "Siemensdamm", coords: [52.53698, 13.27395] },
+                    { name: "Halemweg", coords: [52.53585, 13.28635] },
+                    { name: "Jakob-Kaiser-Platz", coords: [52.53422, 13.29385] },
+                    { name: "Jungfernheide", coords: [52.53032, 13.29965] },
+                    { name: "Mierendorffplatz", coords: [52.52655, 13.30512] },
+                    { name: "Richard-Wagner-Platz", coords: [52.51592, 13.30735] },
+                    { name: "Bismarckstraße", coords: [52.51212, 13.30575] },
+                    { name: "Wilmersdorfer Straße", coords: [52.50635, 13.30685] },
+                    { name: "Adenauerplatz", coords: [52.49982, 13.30735] },
+                    { name: "Konstanzer Straße", coords: [52.49392, 13.30975] },
+                    { name: "Fehrbelliner Platz", coords: [52.49015, 13.31435] },
+                    { name: "Blissestraße", coords: [52.48645, 13.32165] },
+                    { name: "Berliner Straße", coords: [52.48725, 13.33125] },
+                    { name: "Bayerischer Platz", coords: [52.48892, 13.34015] },
+                    { name: "Eisenacher Straße", coords: [52.48945, 13.35185] },
+                    { name: "Kleistpark", coords: [52.49122, 13.36015] },
+                    { name: "Yorckstraße", coords: [52.49265, 13.37125] },
+                    { name: "Möckernbrücke", coords: [52.49912, 13.38315] },
+                    { name: "Mehringdamm", coords: [52.49357, 13.38814] },
+                    { name: "Gneisenaustraße", coords: [52.49142, 13.39625] },
+                    { name: "Südstern", coords: [52.48942, 13.40795] },
+                    { name: "Hermannplatz", coords: [52.48732, 13.42485] },
+                    { name: "Rathaus Neukölln", coords: [52.48152, 13.43405] },
+                    { name: "Karl-Marx-Straße", coords: [52.47645, 13.43955] },
+                    { name: "Neukölln", coords: [52.46982, 13.44295] },
+                    { name: "Grenzallee", coords: [52.46342, 13.44485] },
+                    { name: "Blaschkoallee", coords: [52.45205, 13.45045] },
+                    { name: "Parchimer Allee", coords: [52.44452, 13.44985] },
+                    { name: "Britz-Süd", coords: [52.43732, 13.44825] },
+                    { name: "Johannisthaler Chaussee", coords: [52.42895, 13.45375] },
+                    { name: "Lipschitzallee", coords: [52.42322, 13.46345] },
+                    { name: "Wutzkyallee", coords: [52.41592, 13.47515] },
+                    { name: "Zwickauer Damm", coords: [52.40432, 13.48405] },
+                    { name: "Rudow", coords: [52.39585, 13.49825] }
+                ]
+            },
+            "U8": {
+                color: "#034e7e", intervalMinutes: 4.5, offsetMeters: 0,
+                stations: [
+                    { name: "Wittenau", coords: [52.5958, 13.3364] },
+                    { name: "Rathaus Reinickendorf", coords: [52.5886, 13.3267] },
+                    { name: "Karl-Bonhoeffer-Nervenklinik", coords: [52.5778, 13.3314] },
+                    { name: "Lindauer Allee", coords: [52.5722, 13.3397] },
+                    { name: "Paracelsus-Bad", coords: [52.5694, 13.3517] },
+                    { name: "Residenzstraße", coords: [52.5617, 13.3606] },
+                    { name: "Franz-Neumann-Platz", coords: [52.5564, 13.3664] },
+                    { name: "Osloer Straße", coords: [52.5568, 13.3734] },
+                    { name: "Pankstraße", coords: [52.5517, 13.3814] },
+                    { name: "Gesundbrunnen", coords: [52.5489, 13.3889] },
+                    { name: "Voltastraße", coords: [52.5422, 13.3931] },
+                    { name: "Bernauer Straße", coords: [52.5369, 13.3986] },
+                    { name: "Rosenthaler Platz", coords: [52.5300, 13.4014] },
+                    { name: "Weinmeisterstraße", coords: [52.5250, 13.4050] },
+                    { name: "Alexanderplatz", coords: [52.5214, 13.4111] },
+                    { name: "Jannowitzbrücke", coords: [52.5153, 13.4181] },
+                    { name: "Heinrich-Heine-Straße", coords: [52.5108, 13.4158] },
+                    { name: "Moritzplatz", coords: [52.5036, 13.4108] },
+                    { name: "Kottbusser Tor", coords: [52.4992, 13.4181] },
+                    { name: "Schönleinstraße", coords: [52.4931, 13.4219] },
+                    { name: "Hermannplatz", coords: [52.4873, 13.4248] },
+                    { name: "Boddinstraße", coords: [52.4800, 13.4256] },
+                    { name: "Leinestraße", coords: [52.4739, 13.4278] },
+                    { name: "Hermannstraße", coords: [52.4678, 13.4314] }
+                ]
+            },
+            "U9": {
+                color: "#e6b800", intervalMinutes: 4, offsetMeters: 0,
+                stations: [
+                    { name: "Osloer Straße", coords: [52.55685, 13.37345] },
+                    { name: "Nauener Platz", coords: [52.55182, 13.36625] },
+                    { name: "Leopoldplatz", coords: [52.54685, 13.35935] },
+                    { name: "Amrumer Straße", coords: [52.54232, 13.35045] },
+                    { name: "Westhafen", coords: [52.53622, 13.34405] },
+                    { name: "Birkenstraße", coords: [52.53182, 13.34155] },
+                    { name: "Turmstraße", coords: [52.52622, 13.34235] },
+                    { name: "Hansaplatz", coords: [52.51792, 13.34265] },
+                    { name: "Zoologischer Garten", coords: [52.50735, 13.33265] },
+                    { name: "Kurfürstendamm", coords: [52.50402, 13.33155] },
+                    { name: "Spichernstraße", coords: [52.49652, 13.33095] },
+                    { name: "Güntzelstraße", coords: [52.49182, 13.33125] },
+                    { name: "Berliner Straße", coords: [52.48725, 13.33125] },
+                    { name: "Bundesplatz", coords: [52.47792, 13.32905] },
+                    { name: "Friedrich-Wilhelm-Platz", coords: [52.47232, 13.32845] },
+                    { name: "Walther-Schreiber-Platz", coords: [52.46982, 13.32845] },
+                    { name: "Schloßstraße", coords: [52.46152, 13.32455] },
+                    { name: "Rathaus Steglitz", coords: [52.45622, 13.32095] }
+                ]
+            }
         };
 
         // ========================================================
-        // 3. MATEMATİK VE GEOMETRİ MOTORU
+        // 3. MATEMATİK VE OFSET MOTORU
         // ========================================================
         function getDistanceMeters(c1, c2) {
             const R = 6371000;
@@ -373,140 +418,140 @@
                    v0 * t + p1;
         }
 
-        // Metro ve Rayları Pürüzsüz Bağlayan Fonksiyon (Yan Sapmasız)
-        function buildTrack(stations, isSubdivided = true) {
+        function applyNormalOffset(coords, offsetMeters) {
+            if (!offsetMeters || offsetMeters === 0) return coords;
+            const result = [];
+            for (let i = 0; i < coords.length; i++) {
+                const prev = coords[Math.max(0, i - 1)];
+                const next = coords[Math.min(coords.length - 1, i + 1)];
+                const bearing = getBearing(prev, next);
+                const normalAngle = (bearing + 90) * Math.PI / 180;
+
+                const lat = coords[i][0];
+                const dLat = (offsetMeters * Math.cos(normalAngle)) / 111111;
+                const dLng = (offsetMeters * Math.sin(normalAngle)) / (111111 * Math.cos(lat * Math.PI / 180));
+
+                result.push([lat + dLat, coords[i][1] + dLng]);
+            }
+            return result;
+        }
+
+        function buildTrack(stations, subdivisions = 12, offsetMeters = 0) {
             const points = stations.map(s => s.coords);
-            const coords = [];
+            const rawCoords = [];
 
-            if (isSubdivided) {
-                const sub = 12;
-                for (let i = 0; i < points.length - 1; i++) {
-                    const p0 = i > 0 ? points[i - 1] : points[i];
-                    const p1 = points[i];
-                    const p2 = points[i + 1];
-                    const p3 = i < points.length - 2 ? points[i + 2] : p2;
+            for (let i = 0; i < points.length - 1; i++) {
+                const p0 = i > 0 ? points[i - 1] : points[i];
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const p3 = i < points.length - 2 ? points[i + 2] : p2;
 
-                    for (let j = 0; j < sub; j++) {
-                        const t = j / sub;
-                        coords.push([
-                            catmullRom(p0[0], p1[0], p2[0], p3[0], t),
-                            catmullRom(p0[1], p1[1], p2[1], p3[1], t)
-                        ]);
-                    }
+                for (let j = 0; j < subdivisions; j++) {
+                    const t = j / subdivisions;
+                    rawCoords.push([
+                        catmullRom(p0[0], p1[0], p2[0], p3[0], t),
+                        catmullRom(p0[1], p1[1], p2[1], p3[1], t)
+                    ]);
                 }
-                coords.push(points[points.length - 1]);
-            } else {
-                points.forEach(p => coords.push(p));
             }
+            rawCoords.push(points[points.length - 1]);
 
-            const track = [{ coords: coords[0], distance: 0 }];
+            const finalCoords = applyNormalOffset(rawCoords, offsetMeters);
+
+            const track = [{ coords: finalCoords[0], distance: 0 }];
             let total = 0;
-
-            for (let i = 1; i < coords.length; i++) {
-                total += getDistanceMeters(coords[i - 1], coords[i]);
-                track.push({ coords: coords[i], distance: total });
+            for (let i = 1; i < finalCoords.length; i++) {
+                total += getDistanceMeters(finalCoords[i - 1], finalCoords[i]);
+                track.push({ coords: finalCoords[i], distance: total });
             }
 
-            return {
-                track,
-                totalDistance: total,
-                startTerm: stations[0].name,
-                endTerm: stations[stations.length - 1].name
-            };
+            const stationsWithDist = stations.map(st => {
+                let closest = track[0];
+                let minDist = Infinity;
+                track.forEach(pt => {
+                    const d = getDistanceMeters(pt.coords, st.coords);
+                    if (d < minDist) {
+                        minDist = d;
+                        closest = pt;
+                    }
+                });
+                return { ...st, trackDistance: closest.distance };
+            });
+
+            return { track, totalDistance: total, stations: stationsWithDist };
         }
 
         // ========================================================
-        // 4. ARAÇ MOTORU
+        // 4. BEYAZ KONTURLU KAPSÜL & 6 VAGONLU LOD MOTORU
         // ========================================================
-        class NetworkVehicle {
-            constructor(id, lineKey, type, trackNetwork, color, initialDistance, direction, speedKmh = 33, isLoop = false) {
+        class AdvancedLODTrain {
+            constructor(id, lineKey, trackNetwork, color, initialDistance, direction) {
                 this.id = id;
                 this.lineKey = lineKey;
-                this.type = type;
                 this.network = trackNetwork;
-                this.originalColor = color;
-                this.isLoop = isLoop;
+                this.color = color;
+                this.carCount = 6;
                 
-                if (this.type === "BUS") {
-                    this.carCount = 1;
-                    this.carriageLength = 18.0;
-                    this.carriageWidth = 3.2;
-                    this.unitSpacing = 19.0;
-                } else if (this.type === "S") {
-                    this.carCount = 6;
-                    this.carriageLength = 18.0;
-                    this.carriageWidth = 3.2;
-                    this.unitSpacing = 19.2;
-                } else {
-                    this.carCount = 6;
-                    this.carriageLength = 15.0;
-                    this.carriageWidth = 3.0;
-                    this.unitSpacing = 16.2;
-                }
+                this.carriageLength = 15.0;
+                this.carriageWidth = 3.0;
+                this.unitSpacing = 16.2;
+                this.totalTrainLength = this.carCount * this.unitSpacing;
 
-                this.totalLength = this.carCount * this.unitSpacing;
-                this.minDist = this.totalLength;
+                this.minDist = this.totalTrainLength;
                 this.maxDist = this.network.totalDistance;
 
-                this.direction = this.isLoop ? 1 : direction;
-                this.currentDistance = initialDistance;
-                this.speedMps = (speedKmh * 1000) / 3600;
+                // Zaman damgasına göre gelen mesafeyi sınırla
+                this.currentDistance = Math.max(this.minDist, Math.min(initialDistance, this.maxDist));
+                this.direction = direction;
+                this.speedMps = (33 * 1000) / 3600; // 33 km/s
+
+                this.isDwelling = false;
+                this.dwellTimer = 0;
+                this.visitedStations = new Set();
 
                 this.markers = [];
-                this.createGraphics();
+                this.createCarriages();
+
+                this.capsuleBorder = L.polyline([], {
+                    color: '#ffffff',
+                    weight: 8,
+                    opacity: 0.95,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }).addTo(map);
+
+                this.capsuleCore = L.polyline([], {
+                    color: this.color,
+                    weight: 5,
+                    opacity: 1.0,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }).addTo(map);
+
+                // İlk kareyi hemen çiz
+                this.render();
             }
 
-            getDirectionTerm() {
-                if (this.isLoop) {
-                    return this.lineKey === "S41" ? "Ringbahn ↻ (Saat Yönü)" : "Ringbahn ↺ (Saatin Tersi Yönü)";
-                }
-                return this.direction === 1 ? this.network.endTerm : this.network.startTerm;
-            }
-
-            createGraphics() {
+            createCarriages() {
                 for (let i = 0; i < this.carCount; i++) {
                     const icon = L.divIcon({
                         className: 'carriage-container',
                         iconSize: [0, 0],
-                        html: `<svg style="overflow: visible; pointer-events: auto; cursor: pointer;">
+                        html: `<svg style="overflow: visible; pointer-events: none;">
                                    <rect class="train-carriage" rx="2" ry="2" 
-                                         fill="${this.originalColor}" 
+                                         fill="${this.color}" 
                                          stroke="#ffffff" 
-                                         stroke-width="1.2"
+                                         stroke-width="1.4"
                                          style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.35));" />
                                </svg>`
                     });
                     const marker = L.marker(this.network.track[0].coords, { icon: icon }).addTo(map);
-
-                    marker.on('click', (e) => {
-                        L.DomEvent.stopPropagation(e);
-                        selectLine(this.lineKey);
-
-                        const content = `
-                            <div class="simple-hud">
-                                <div class="hud-line-header" style="background:${this.originalColor};">
-                                    ${this.lineKey}
-                                </div>
-                                <div class="hud-direction">
-                                    Yön: <b>${this.getDirectionTerm()}</b>
-                                </div>
-                            </div>
-                        `;
-                        L.popup().setLatLng(marker.getLatLng()).setContent(content).openOn(map);
-                    });
-
                     this.markers.push(marker);
                 }
             }
 
             getPointAtDistance(d) {
-                let target = d;
-                if (this.isLoop) {
-                    target = ((target % this.network.totalDistance) + this.network.totalDistance) % this.network.totalDistance;
-                } else {
-                    target = Math.max(0, Math.min(target, this.network.totalDistance));
-                }
-
+                let target = Math.max(0, Math.min(d, this.network.totalDistance));
                 const track = this.network.track;
                 let low = 0, high = track.length - 1;
                 while (low <= high) {
@@ -526,22 +571,58 @@
                 ];
             }
 
+            getTrackSegment(startDist, endDist) {
+                const s = Math.min(startDist, endDist);
+                const e = Math.max(startDist, endDist);
+                const points = [this.getPointAtDistance(s)];
+                
+                for (let pt of this.network.track) {
+                    if (pt.distance > s && pt.distance < e) {
+                        points.push(pt.coords);
+                    }
+                }
+                points.push(this.getPointAtDistance(e));
+                return points;
+            }
+
+            checkDwell() {
+                if (this.isDwelling) return;
+                for (let st of this.network.stations) {
+                    const diff = Math.abs(this.currentDistance - st.trackDistance);
+                    if (diff < 20 && !this.visitedStations.has(st.name)) {
+                        this.isDwelling = true;
+                        this.dwellTimer = 20;
+                        this.visitedStations.add(st.name);
+                        break;
+                    } else if (diff > 80) {
+                        this.visitedStations.delete(st.name);
+                    }
+                }
+            }
+
             update(deltaSeconds) {
-                if (this.isLoop) {
+                if (this.isDwelling) {
+                    this.dwellTimer -= deltaSeconds;
+                    if (this.dwellTimer <= 0) {
+                        this.isDwelling = false;
+                    }
+                    this.render();
+                    return;
+                }
+
+                this.currentDistance += this.speedMps * deltaSeconds * this.direction;
+                this.checkDwell();
+
+                if (this.currentDistance >= this.maxDist) {
+                    this.currentDistance = this.maxDist;
+                    this.direction = -1;
+                    this.isDwelling = true;
+                    this.dwellTimer = 30;
+                } else if (this.currentDistance <= this.minDist) {
+                    this.currentDistance = this.minDist;
                     this.direction = 1;
-                    this.currentDistance += this.speedMps * deltaSeconds;
-                    if (this.currentDistance >= this.network.totalDistance) {
-                        this.currentDistance = this.currentDistance % this.network.totalDistance;
-                    }
-                } else {
-                    this.currentDistance += this.speedMps * deltaSeconds * this.direction;
-                    if (this.currentDistance >= this.maxDist) {
-                        this.currentDistance = this.maxDist;
-                        this.direction = -1;
-                    } else if (this.currentDistance <= this.minDist) {
-                        this.currentDistance = this.minDist;
-                        this.direction = 1;
-                    }
+                    this.isDwelling = true;
+                    this.dwellTimer = 30;
                 }
 
                 this.render();
@@ -552,239 +633,146 @@
                 const centerLat = this.network.track[0].coords[0];
                 const metersPerPixel = (40075016.686 * Math.abs(Math.cos(centerLat * Math.PI / 180))) / Math.pow(2, zoom + 8);
                 
-                const pixLength = Math.max(10, this.carriageLength / metersPerPixel);
-                const pixWidth = Math.max(4.0, this.carriageWidth / metersPerPixel);
+                const headDist = this.currentDistance;
+                const tailDist = headDist - (this.totalTrainLength * this.direction);
 
-                const isFaded = selectedLineKey !== null && selectedLineKey !== this.lineKey;
-                const currentColor = isFaded ? FADED_COLOR : this.originalColor;
-                const currentOpacity = isFaded ? FADED_OPACITY : 1.0;
+                if (zoom >= 15.25) {
+                    this.capsuleBorder.setStyle({ opacity: 0 });
+                    this.capsuleCore.setStyle({ opacity: 0 });
 
-                for (let i = 0; i < this.carCount; i++) {
-                    const carDist = this.currentDistance - (i * this.unitSpacing * this.direction);
-                    const centerPos = this.getPointAtDistance(carDist);
-                    const leadPos = this.getPointAtDistance(carDist + (1.0 * this.direction));
-                    const angle = getBearing(centerPos, leadPos);
+                    const pixLength = Math.max(14, this.carriageLength / metersPerPixel);
+                    const pixWidth = Math.max(5.5, this.carriageWidth / metersPerPixel);
 
-                    this.markers[i].setLatLng(centerPos);
-                    const markerEl = this.markers[i].getElement();
-                    if (markerEl) {
-                        const rect = markerEl.querySelector('rect');
-                        if (rect) {
-                            rect.setAttribute('width', pixWidth);
-                            rect.setAttribute('height', pixLength);
-                            rect.setAttribute('x', -pixWidth / 2);
-                            rect.setAttribute('y', -pixLength / 2);
-                            rect.setAttribute('fill', currentColor);
-                            rect.style.opacity = currentOpacity;
-                            rect.style.transform = `rotate(${angle}deg)`;
-                            rect.style.transformOrigin = '0 0';
+                    for (let i = 0; i < this.carCount; i++) {
+                        const carDist = this.currentDistance - (i * this.unitSpacing * this.direction);
+                        const centerPos = this.getPointAtDistance(carDist);
+                        const leadPos = this.getPointAtDistance(carDist + (1.0 * this.direction));
+                        const angle = getBearing(centerPos, leadPos);
+
+                        this.markers[i].setLatLng(centerPos);
+                        const markerEl = this.markers[i].getElement();
+                        if (markerEl) {
+                            markerEl.style.display = 'block';
+                            const rect = markerEl.querySelector('rect');
+                            if (rect) {
+                                rect.setAttribute('width', pixWidth);
+                                rect.setAttribute('height', pixLength);
+                                rect.setAttribute('x', -pixWidth / 2);
+                                rect.setAttribute('y', -pixLength / 2);
+                                rect.style.transform = `rotate(${angle}deg)`;
+                                rect.style.transformOrigin = '0 0';
+                            }
                         }
                     }
+                } else {
+                    for (let i = 0; i < this.carCount; i++) {
+                        const markerEl = this.markers[i].getElement();
+                        if (markerEl) markerEl.style.display = 'none';
+                    }
+
+                    const segmentCoords = this.getTrackSegment(tailDist, headDist);
+
+                    const coreWidth = Math.max(3.5, Math.min(8.5, (zoom - 10) * 1.5 + 2));
+                    const borderWidth = coreWidth + 2.5;
+
+                    this.capsuleBorder.setLatLngs(segmentCoords);
+                    this.capsuleBorder.setStyle({
+                        opacity: 0.95,
+                        weight: borderWidth
+                    });
+
+                    this.capsuleCore.setLatLngs(segmentCoords);
+                    this.capsuleCore.setStyle({
+                        opacity: 1.0,
+                        weight: coreWidth
+                    });
                 }
             }
         }
 
         // ========================================================
-        // 5. AĞIN KURULMASI
+        // 5. HATLARIN VE DİNAMİK SAATE GÖRE FİLONUN BAŞLATILMASI
         // ========================================================
         const fleet = [];
-        const linePolylines = {};
-        const stationMarkers = [];
         const badgesContainer = document.getElementById('badges-container');
         const renderedStations = new Set();
+
+        // Şu anki gerçek zaman damgası (Saniye cinsinden)
         const globalEpochSeconds = Date.now() / 1000;
 
-        let countUbahn = 0;
-        let countSbahn = 0;
-        let countBus = 0;
+        Object.keys(U_LINES).forEach(key => {
+            const lineData = U_LINES[key];
+            const net = buildTrack(lineData.stations, 12, lineData.offsetMeters);
 
-        Object.keys(NETWORK_LINES).forEach(key => {
-            const lineData = NETWORK_LINES[key];
-            
-            // Tüm hatlar için temiz ve stabil Catmull-Rom eğrisi (Yol sapması kaldırıldı)
-            const net = buildTrack(lineData.stations, true);
-
-            // Rozet Butonları
             const badge = document.createElement('span');
             badge.className = 'line-tag';
-            badge.id = `badge-${key}`;
             badge.style.backgroundColor = lineData.color;
             badge.innerText = key;
-            badge.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (selectedLineKey === key) resetSelection();
-                else selectLine(key);
-            });
             badgesContainer.appendChild(badge);
 
-            // Hat Çizgisi
-            const poly = L.polyline(net.track.map(t => t.coords), {
+            L.polyline(net.track.map(t => t.coords), {
                 color: lineData.color,
-                weight: lineData.type === 'BUS' ? 3.5 : 4.0,
-                opacity: 0.85,
-                dashArray: lineData.type === 'BUS' ? '6, 6' : null
+                weight: 4.0,
+                opacity: 0.85
             }).addTo(map);
 
-            poly.on('click', (e) => {
-                L.DomEvent.stopPropagation(e);
-                selectLine(key);
-            });
-
-            linePolylines[key] = { polyline: poly, originalColor: lineData.color, type: lineData.type };
-
-            // Durak İşaretçileri (Tüm duraklar haritada tam yerindedir)
             lineData.stations.forEach(st => {
                 const coordKey = `${st.coords[0].toFixed(4)},${st.coords[1].toFixed(4)}`;
                 if (!renderedStations.has(coordKey)) {
                     renderedStations.add(coordKey);
-                    const marker = L.circleMarker(st.coords, {
-                        radius: lineData.type === 'BUS' ? 2.8 : 3.8,
+                    L.circleMarker(st.coords, {
+                        radius: 4.0,
                         fillColor: "#ffffff",
                         color: "#1e293b",
-                        weight: 1.8,
+                        weight: 2.0,
                         opacity: 1,
                         fillOpacity: 1,
                         className: "station-node"
                     }).bindPopup(`<b>${st.name}</b>`).addTo(map);
-                    
-                    stationMarkers.push(marker);
                 }
             });
 
-            // Filo Hesaplama
-            const fullTripSeconds = (net.totalDistance / (lineData.speed * 1000 / 3600));
+            // Sefer sıklığı ve gerçek zamanlı konum hesaplama
+            const oneWayMinutes = (net.totalDistance / (33 * 1000 / 60));
+            const trainsPerDir = Math.max(2, Math.round(oneWayMinutes / lineData.intervalMinutes));
+            const totalTrains = trainsPerDir * 2;
 
-            if (lineData.isLoop) {
-                const totalRingTrains = 7;
-                for (let i = 0; i < totalRingTrains; i++) {
-                    const staggerSeconds = (i / totalRingTrains) * fullTripSeconds;
-                    const timeInCycle = (globalEpochSeconds + staggerSeconds) % fullTripSeconds;
-                    const calculatedDistance = (timeInCycle / fullTripSeconds) * net.totalDistance;
+            const oneWaySeconds = oneWayMinutes * 60;
+            const roundTripSeconds = oneWaySeconds * 2;
 
-                    const vehicle = new NetworkVehicle(
-                        `${key}-${i+1}`,
-                        key,
-                        lineData.type,
-                        net,
-                        lineData.color,
-                        calculatedDistance,
-                        1,
-                        lineData.speed,
-                        true
-                    );
+            for (let i = 0; i < totalTrains; i++) {
+                // Trenleri hatta eşit aralıklarla dağıtan zaman ofseti
+                const staggerSeconds = (i / totalTrains) * roundTripSeconds;
+                // Gerçek saat + aralık ofseti -> tam tur döngüsünde anlık konum
+                const timeInCycle = (globalEpochSeconds + staggerSeconds) % roundTripSeconds;
 
-                    countSbahn++;
-                    fleet.push(vehicle);
+                let isForward = true;
+                let calculatedDistance = 0;
+
+                if (timeInCycle < oneWaySeconds) {
+                    isForward = true;
+                    calculatedDistance = (timeInCycle / oneWaySeconds) * net.totalDistance;
+                } else {
+                    isForward = false;
+                    const returnTime = timeInCycle - oneWaySeconds;
+                    calculatedDistance = net.totalDistance - ((returnTime / oneWaySeconds) * net.totalDistance);
                 }
-            } else {
-                const oneWaySeconds = fullTripSeconds;
-                const roundTripSeconds = oneWaySeconds * 2;
-                const trainsPerDir = Math.max(2, Math.round((oneWaySeconds / 60) / lineData.interval));
-                const totalVehicles = trainsPerDir * 2;
 
-                for (let i = 0; i < totalVehicles; i++) {
-                    const staggerSeconds = (i / totalVehicles) * roundTripSeconds;
-                    const timeInCycle = (globalEpochSeconds + staggerSeconds) % roundTripSeconds;
-
-                    let isForward = true;
-                    let calculatedDistance = 0;
-
-                    if (timeInCycle < oneWaySeconds) {
-                        isForward = true;
-                        calculatedDistance = (timeInCycle / oneWaySeconds) * net.totalDistance;
-                    } else {
-                        isForward = false;
-                        const returnTime = timeInCycle - oneWaySeconds;
-                        calculatedDistance = net.totalDistance - ((returnTime / oneWaySeconds) * net.totalDistance);
-                    }
-
-                    const vehicle = new NetworkVehicle(
-                        `${key}-${i+1}`,
-                        key,
-                        lineData.type,
-                        net,
-                        lineData.color,
-                        calculatedDistance,
-                        isForward ? 1 : -1,
-                        lineData.speed,
-                        false
-                    );
-
-                    if (lineData.type === 'U') countUbahn++;
-                    else if (lineData.type === 'S') countSbahn++;
-                    else if (lineData.type === 'BUS') countBus++;
-
-                    fleet.push(vehicle);
-                }
+                fleet.push(new AdvancedLODTrain(
+                    `${key}-${i+1}`,
+                    key,
+                    net,
+                    lineData.color,
+                    calculatedDistance,
+                    isForward ? 1 : -1
+                ));
             }
         });
 
-        document.getElementById('cnt-ubahn').innerText = countUbahn;
-        document.getElementById('cnt-sbahn').innerText = countSbahn;
-        document.getElementById('cnt-bus').innerText = countBus;
+        document.getElementById('fleet-count').innerText = `${fleet.length} Aktif Tren Hatta`;
 
         // ========================================================
-        // 6. ODAKLAMA VE SEÇİM TEMİZLEME
-        // ========================================================
-        function selectLine(key) {
-            selectedLineKey = key;
-            document.getElementById('active-focus-info').innerText = `Odak: ${key} (Temizlemek için boşluğa tıklayın)`;
-            updateVisualStyles();
-        }
-
-        function resetSelection() {
-            selectedLineKey = null;
-            document.getElementById('active-focus-info').innerText = `Tümü Aktif (Odaklamak için hatta tıklayın)`;
-            updateVisualStyles();
-        }
-
-        map.on('click', () => {
-            resetSelection();
-        });
-
-        function updateVisualStyles() {
-            Object.keys(linePolylines).forEach(k => {
-                const item = linePolylines[k];
-                if (selectedLineKey === null || selectedLineKey === k) {
-                    item.polyline.setStyle({
-                        color: item.originalColor,
-                        opacity: 0.85,
-                        weight: item.type === 'BUS' ? 3.5 : 4.0
-                    });
-                } else {
-                    item.polyline.setStyle({
-                        color: FADED_COLOR,
-                        opacity: FADED_OPACITY,
-                        weight: 2.0
-                    });
-                }
-            });
-
-            Object.keys(NETWORK_LINES).forEach(k => {
-                const badge = document.getElementById(`badge-${k}`);
-                if (badge) {
-                    if (selectedLineKey === null || selectedLineKey === k) {
-                        badge.style.opacity = "1";
-                        badge.style.transform = selectedLineKey === k ? "scale(1.1)" : "scale(1.0)";
-                    } else {
-                        badge.style.opacity = "0.35";
-                        badge.style.transform = "scale(1.0)";
-                    }
-                }
-            });
-
-            stationMarkers.forEach(st => {
-                st.setStyle({
-                    opacity: selectedLineKey === null ? 1.0 : 0.35,
-                    fillOpacity: selectedLineKey === null ? 1.0 : 0.35
-                });
-            });
-
-            fleet.forEach(v => v.render());
-        }
-
-        // ========================================================
-        // 7. ANİMASYON MOTORU
+        // 6. ANİMASYON MOTORU
         // ========================================================
         let lastTime = performance.now();
 
@@ -792,33 +780,61 @@
             const deltaSeconds = (currentTime - lastTime) / 1000;
             lastTime = currentTime;
 
+            let dwellingCount = 0;
+
             if (deltaSeconds < 1.0) {
-                fleet.forEach(v => v.update(deltaSeconds));
+                fleet.forEach(train => {
+                    train.update(deltaSeconds);
+                    if (train.isDwelling) dwellingCount++;
+                });
             }
 
+            document.getElementById('dwell-count').innerText = `${dwellingCount} Durakta Bekleyen`;
             requestAnimationFrame(renderEngine);
         }
 
         requestAnimationFrame(renderEngine);
 
         map.on('zoom', () => {
-            fleet.forEach(v => v.render());
+            const z = map.getZoom();
+            document.getElementById('zoom-indicator').innerText = `Zoom: ${z.toFixed(2)}`;
+            fleet.forEach(train => train.render());
         });
 
-        // PWA Kurulum Butonu
+        // ========================================================
+        // 7. PWA VE OTOMATİK YÜKLEME MOTORU
+        // ========================================================
         let deferredPrompt;
+        const headerContainer = document.querySelector('.status-container');
+        const installBtn = document.createElement('button');
+        installBtn.innerText = "📲 Uygulamayı Yükle";
+        installBtn.style.cssText = "background: #0284c7; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; cursor: pointer; display: none; margin-left: 8px;";
+        headerContainer.appendChild(installBtn);
+
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            const slot = document.getElementById('install-slot');
-            slot.innerHTML = `<button id="btn-install" style="background:#0284c7; color:#fff; border:none; padding:3px 8px; border-radius:4px; font-weight:bold; font-size:11px; cursor:pointer;">📲 Yükle</button>`;
-            document.getElementById('btn-install').addEventListener('click', async () => {
+            installBtn.style.display = 'inline-block';
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
                 deferredPrompt.prompt();
                 const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') slot.innerHTML = '';
+                if (outcome === 'accepted') {
+                    installBtn.style.display = 'none';
+                }
                 deferredPrompt = null;
-            });
+            }
         });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((reg) => console.log("PWA Aktif, Kapsam:", reg.scope))
+                    .catch(err => console.log("PWA Hatası:", err));
+            });
+        }
     </script>
 </body>
 </html>
