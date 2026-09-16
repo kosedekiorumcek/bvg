@@ -154,30 +154,31 @@
 
     <script>
         // ========================================================
-        // 1. HARİTA ALTYAPISI (GARANTİLİ CARTO POSITRON KATMANI)
+        // 1. TAMAMEN AÇIK VE FİLİGRANSIZ HARİTA ALTYAPISI
         // ========================================================
         const map = L.map('map', {
             zoomSnap: 0.25,
             zoomDelta: 0.5
         }).setView([52.5160, 13.3400], 12.0);
 
-        // Kesinlikle gri kalmayan, hafif ve net harita servisi
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        // OpenStreetMap Standart Sunucusu - API Key gerektirmez, damga içermez
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            subdomains: 'abcd',
-            attribution: '&copy; OpenStreetMap &copy; CARTO'
+            attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
         let selectedLineKey = null;
         const FADED_COLOR = "#94a3b8";
         const FADED_OPACITY = 0.20;
 
-        // ========================================================
-        // 2. RESMİ RENK VE DOĞRULANMIŞ GÜZERGAH DÜĞÜMLERİ
-        // ========================================================
-        const SBAHN_COLOR = "#00864e"; // BVG / S-Bahn Yeşili
-        const BUS_COLOR = "#b91c1c";   // BVG Otobüs Kırmızısı
+        const SBAHN_COLOR = "#00864e"; // Resmi S-Bahn Yeşili
+        const BUS_COLOR = "#b91c1c";   // Resmi BVG Kırmızısı
 
+        // ========================================================
+        // 2. DOĞRULANMIŞ VE DETAYLI RAY / YOL GEOMETRİLERİ
+        // ========================================================
+        
+        // U-Bahn Ortak İstasyonları
         const SHARED_U1_U3 = [
             { name: "Wittenbergplatz", coords: [52.5019, 13.3428] },
             { name: "Nollendorfplatz", coords: [52.4994, 13.3539] },
@@ -192,56 +193,69 @@
             { name: "Warschauer Straße", coords: [52.5058, 13.4494] }
         ];
 
-        const REAL_STADTBAHN_WAYPOINTS = [
-            [52.5011, 13.2836], [52.5047, 13.3033], [52.5053, 13.3197],
-            [52.5073, 13.3326], [52.5110, 13.3350], [52.5139, 13.3364],
-            [52.5175, 13.3420], [52.5203, 13.3478], [52.5230, 13.3570],
-            [52.5258, 13.3689], [52.5225, 13.3780], [52.5203, 13.3869],
-            [52.5225, 13.4022], [52.5214, 13.4111], [52.5153, 13.4181],
-            [52.5106, 13.4347], [52.5058, 13.4494], [52.5031, 13.4692]
+        // M45: Gerçek Yol Geometrisi (Cadde Virajları Birebir Dahil)
+        const M45_HIGH_RES_WAYPOINTS = [
+            [52.5606, 13.1952], // Johannesstift
+            [52.5562, 13.1973], [52.5518, 13.1994], [52.5458, 13.2008], [52.5392, 13.2014], // Neuendorfer Str.
+            [52.5365, 13.2012], [52.5358, 13.2023], [52.5361, 13.2065], // Altstädter Ring & Rathaus Spandau
+            [52.5372, 13.2135], [52.5378, 13.2201], [52.5368, 13.2272], [52.5332, 13.2341], // Ruhlebener Str.
+            [52.5283, 13.2392], [52.5270, 13.2435], [52.5255, 13.2530], [52.5244, 13.2625], // Charlottenburger Chaussee
+            [52.5230, 13.2721], [52.5218, 13.2810], [52.5212, 13.2882], [52.5210, 13.2958], // Spandauer Damm & Schloss
+            [52.5199, 13.3005], [52.5178, 13.3045], [52.5159, 13.3074], // Richard-Wagner-Platz
+            [52.5147, 13.3130], [52.5135, 13.3182], [52.5128, 13.3219], // Otto-Suhr-Allee & Ernst-Reuter-Platz
+            [52.5108, 13.3262], [52.5088, 13.3305], [52.5074, 13.3327]  // Hardenbergstr. & Zoo
         ];
 
-        // Ringbahn Dairesel Geometrisi (Tam Kapalı Çember)
-        const RING_NODES = [
-            [52.4753, 13.3653], // Südkreuz
-            [52.4792, 13.3517], // Schöneberg
-            [52.4786, 13.3433], // Innsbrucker Platz
-            [52.4779, 13.3291], // Bundesplatz
-            [52.4800, 13.3117], // Heidelberger Platz
-            [52.4961, 13.2889], // Halensee
+        // S-Bahn Stadtbahn: Gerçek Demiryolu Viyadükleri (Westkreuz - Ostkreuz)
+        const STADTBAHN_HIGH_RES_WAYPOINTS = [
             [52.5011, 13.2836], // Westkreuz
-            [52.5078, 13.2817], // Messe Nord
-            [52.5181, 13.2847], // Westend
-            [52.5303, 13.2997], // Jungfernheide
-            [52.5344, 13.3289], // Beusselstraße
-            [52.5362, 13.3441], // Westhafen
-            [52.5422, 13.3664], // Wedding
-            [52.5489, 13.3889], // Gesundbrunnen
-            [52.5494, 13.4161], // Schönhauser Allee
-            [52.5442, 13.4278], // Prenzlauer Allee
-            [52.5394, 13.4389], // Greifswalder Straße
-            [52.5289, 13.4556], // Landsberger Allee
-            [52.5136, 13.4750], // Frankfurter Allee
-            [52.5031, 13.4692], // Ostkreuz
-            [52.4936, 13.4614], // Treptower Park
-            [52.4736, 13.4564], // Sonnenallee
-            [52.4698, 13.4429], // Neukölln
-            [52.4678, 13.4314], // Hermannstraße
-            [52.4708, 13.3856], // Tempelhof
-            [52.4753, 13.3653]  // Döngü tamamlandı
+            [52.5032, 13.2930], [52.5047, 13.3033], // Charlottenburg
+            [52.5051, 13.3115], [52.5053, 13.3197], // Savignyplatz
+            [52.5061, 13.3265], [52.5073, 13.3326], // Zoologischer Garten
+            [52.5098, 13.3342], [52.5139, 13.3364], // Tiergarten
+            [52.5170, 13.3418], [52.5203, 13.3478], // Bellevue
+            [52.5228, 13.3562], [52.5251, 13.3640], [52.5258, 13.3689], // Berlin Hauptbahnhof
+            [52.5245, 13.3752], [52.5222, 13.3820], [52.5203, 13.3869], // Friedrichstraße
+            [52.5218, 13.3955], [52.5225, 13.4022], // Hackescher Markt
+            [52.5220, 13.4070], [52.5214, 13.4111], // Alexanderplatz
+            [52.5178, 13.4150], [52.5153, 13.4181], // Jannowitzbrücke
+            [52.5125, 13.4265], [52.5106, 13.4347], // Ostbahnhof
+            [52.5075, 13.4435], [52.5058, 13.4494], // Warschauer Straße
+            [52.5042, 13.4580], [52.5031, 13.4692]  // Ostkreuz
         ];
 
-        // M45 Cadde Güzergahı
-        const REAL_M45_WAYPOINTS = [
-            [52.5597, 13.1969], [52.5510, 13.1990], [52.5430, 13.2005], [52.5357, 13.2008],
-            [52.5375, 13.2050], [52.5385, 13.2120], [52.5370, 13.2250], [52.5278, 13.2389],
-            [52.5240, 13.2600], [52.5215, 13.2800], [52.5208, 13.2956], [52.5185, 13.3030],
-            [52.5159, 13.3074], [52.5140, 13.3150], [52.5128, 13.3219], [52.5100, 13.3270],
-            [52.5074, 13.3327]
+        // S-Bahn Ringbahn: Gerçek Ray Koridoru Düğümleri
+        const RINGBAHN_HIGH_RES_WAYPOINTS = [
+            [52.4753, 13.3653], // Südkreuz
+            [52.4782, 13.3575], [52.4792, 13.3517], // Schöneberg
+            [52.4789, 13.3475], [52.4786, 13.3433], // Innsbrucker Platz
+            [52.4782, 13.3360], [52.4779, 13.3291], // Bundesplatz
+            [52.4790, 13.3200], [52.4800, 13.3117], // Heidelberger Platz
+            [52.4880, 13.2980], [52.4961, 13.2889], // Halensee
+            [52.5011, 13.2836], // Westkreuz
+            [52.5050, 13.2825], [52.5078, 13.2817], // Messe Nord
+            [52.5135, 13.2830], [52.5181, 13.2847], // Westend
+            [52.5245, 13.2910], [52.5303, 13.2997], // Jungfernheide
+            [52.5330, 13.3140], [52.5344, 13.3289], // Beusselstraße
+            [52.5355, 13.3365], [52.5362, 13.3441], // Westhafen
+            [52.5395, 13.3550], [52.5422, 13.3664], // Wedding
+            [52.5458, 13.3780], [52.5489, 13.3889], // Gesundbrunnen
+            [52.5492, 13.4025], [52.5494, 13.4161], // Schönhauser Allee
+            [52.5470, 13.4225], [52.5442, 13.4278], // Prenzlauer Allee
+            [52.5420, 13.4335], [52.5394, 13.4389], // Greifswalder Straße
+            [52.5340, 13.4480], [52.5289, 13.4556], // Landsberger Allee
+            [52.5210, 13.4660], [52.5136, 13.4750], // Frankfurter Allee
+            [52.5080, 13.4725], [52.5031, 13.4692], // Ostkreuz
+            [52.4980, 13.4655], [52.4936, 13.4614], // Treptower Park
+            [52.4830, 13.4590], [52.4736, 13.4564], // Sonnenallee
+            [52.4715, 13.4500], [52.4698, 13.4429], // Neukölln
+            [52.4688, 13.4370], [52.4678, 13.4314], // Hermannstraße
+            [52.4695, 13.4080], [52.4708, 13.3856], // Tempelhof
+            [52.4730, 13.3750], [52.4753, 13.3653]  // Döngü tamamlandı (Südkreuz)
         ];
 
         const NETWORK_LINES = {
-            // U-BAHN
+            // U-BAHN (Yeraltı Pürüzsüz Eğrileri Korundu)
             "U1": { type: "U", color: "#46963c", interval: 4.5, offset: 4, speed: 32, isLoop: false, stations: [{ name: "Uhlandstraße", coords: [52.5028, 13.3256] }, { name: "Kurfürstendamm", coords: [52.5040, 13.3315] }, ...SHARED_U1_U3] },
             "U2": { type: "U", color: "#d63815", interval: 4.0, offset: 0, speed: 32, isLoop: false, stations: [
                 { name: "Ruhleben", coords: [52.5256, 13.2414] }, { name: "Theodor-Heuss-Platz", coords: [52.5108, 13.2731] }, { name: "Bismarckstraße", coords: [52.5121, 13.3057] }, { name: "Zoologischer Garten", coords: [52.5073, 13.3326] }, { name: "Wittenbergplatz", coords: [52.5019, 13.3428] }, { name: "Potsdamer Platz", coords: [52.5097, 13.3758] }, { name: "Alexanderplatz", coords: [52.5214, 13.4111] }, { name: "Pankow", coords: [52.5672, 13.4114] }
@@ -256,17 +270,16 @@
                 { name: "Osloer Straße", coords: [52.5569, 13.3735] }, { name: "Leopoldplatz", coords: [52.5469, 13.3594] }, { name: "Westhafen", coords: [52.5362, 13.3441] }, { name: "Zoologischer Garten", coords: [52.5074, 13.3327] }, { name: "Spichernstraße", coords: [52.4965, 13.3310] }, { name: "Rathaus Steglitz", coords: [52.4562, 13.3210] }
             ]},
 
-            // S-BAHN (Tek Yönlü Stadtbahn ve Ringbahn)
-            "S5": { type: "S", color: SBAHN_COLOR, interval: 5.0, offset: 0, speed: 45, isLoop: false, rawWaypoints: [[52.5344, 13.1975], ...REAL_STADTBAHN_WAYPOINTS, [52.5858, 13.8822]], startTerm: "Spandau", endTerm: "Strausberg Nord" },
-            "S7": { type: "S", color: SBAHN_COLOR, interval: 5.0, offset: 5, speed: 45, isLoop: false, rawWaypoints: [[52.3917, 13.0667], [52.4211, 13.1792], ...REAL_STADTBAHN_WAYPOINTS, [52.5714, 13.5653]], startTerm: "Potsdam Hbf", endTerm: "Ahrensfelde" },
+            // S-BAHN (Gerçek Ray Takibi)
+            "S5": { type: "S", color: SBAHN_COLOR, interval: 5.0, offset: 0, speed: 45, isLoop: false, rawWaypoints: [[52.5344, 13.1975], [52.5180, 13.2450], ...STADTBAHN_HIGH_RES_WAYPOINTS, [52.5858, 13.8822]], startTerm: "Spandau", endTerm: "Strausberg Nord" },
+            "S7": { type: "S", color: SBAHN_COLOR, interval: 5.0, offset: 4, speed: 45, isLoop: false, rawWaypoints: [[52.3917, 13.0667], [52.4211, 13.1792], ...STADTBAHN_HIGH_RES_WAYPOINTS, [52.5714, 13.5653]], startTerm: "Potsdam Hbf", endTerm: "Ahrensfelde" },
             
-            // S41: Sadece Saat Yönünde Döner
-            "S41": { type: "S", color: SBAHN_COLOR, interval: 4.5, offset: 3, speed: 40, isLoop: true, rawWaypoints: RING_NODES, startTerm: "Ringbahn ↻", endTerm: "S41 (Saat Yönü)" },
-            // S42: Sadece Saatin Tersi Yönünde Döner
-            "S42": { type: "S", color: SBAHN_COLOR, interval: 4.5, offset: -3, speed: 40, isLoop: true, rawWaypoints: [...RING_NODES].reverse(), startTerm: "Ringbahn ↺", endTerm: "S42 (Saat Tersi)" },
+            // Ringbahn: Tek Yönlü Kesin Dairesel Döngü
+            "S41": { type: "S", color: SBAHN_COLOR, interval: 4.5, offset: 3, speed: 40, isLoop: true, rawWaypoints: RINGBAHN_HIGH_RES_WAYPOINTS, startTerm: "Ringbahn ↻", endTerm: "S41 (Saat Yönü)" },
+            "S42": { type: "S", color: SBAHN_COLOR, interval: 4.5, offset: -3, speed: 40, isLoop: true, rawWaypoints: [...RINGBAHN_HIGH_RES_WAYPOINTS].reverse(), startTerm: "Ringbahn ↺", endTerm: "S42 (Saat Tersi)" },
 
-            // METROBUS M45
-            "M45": { type: "BUS", color: BUS_COLOR, interval: 4.5, offset: 0, speed: 25, isLoop: false, rawWaypoints: REAL_M45_WAYPOINTS, startTerm: "Spandau, Johannesstift", endTerm: "Zoologischer Garten" }
+            // METROBUS M45 (Gerçek Cadde Takibi)
+            "M45": { type: "BUS", color: BUS_COLOR, interval: 4.5, offset: 0, speed: 25, isLoop: false, rawWaypoints: M45_HIGH_RES_WAYPOINTS, startTerm: "Spandau, Johannesstift", endTerm: "Zoologischer Garten" }
         };
 
         // ========================================================
@@ -319,6 +332,7 @@
             return result;
         }
 
+        // Metro İçin Catmull-Rom Eğrisi
         function buildCurvedTrack(stations, subdivisions = 10, offsetMeters = 0) {
             const points = stations.map(s => s.coords);
             const rawCoords = [];
@@ -356,6 +370,7 @@
             };
         }
 
+        // S-Bahn ve Otobüs İçin Gerçek Yol Noktaları
         function buildExplicitTrack(waypoints, offsetMeters = 0, startTerm = "", endTerm = "") {
             const finalCoords = applyNormalOffset(waypoints, offsetMeters);
             const track = [{ coords: finalCoords[0], distance: 0 }];
@@ -375,7 +390,7 @@
         }
 
         // ========================================================
-        // 4. ARAÇ MODELİ (KATI TEK YÖNLÜ RING MOTORU)
+        // 4. ARAÇ MOTORU
         // ========================================================
         class NetworkVehicle {
             constructor(id, lineKey, type, trackNetwork, color, initialDistance, direction, speedKmh = 33, isLoop = false) {
@@ -407,7 +422,6 @@
                 this.minDist = this.totalLength;
                 this.maxDist = this.network.totalDistance;
 
-                // Ring hatlarında yön HER ZAMAN +1'dir, tersine dönemez
                 this.direction = this.isLoop ? 1 : direction;
                 this.currentDistance = initialDistance;
                 this.speedMps = (speedKmh * 1000) / 3600;
@@ -488,14 +502,12 @@
 
             update(deltaSeconds) {
                 if (this.isLoop) {
-                    // Kesin tek yönlü dairesel akış
                     this.direction = 1;
                     this.currentDistance += this.speedMps * deltaSeconds;
                     if (this.currentDistance >= this.network.totalDistance) {
                         this.currentDistance = this.currentDistance % this.network.totalDistance;
                     }
                 } else {
-                    // Normal hatlar (uçlarda geri döner)
                     this.currentDistance += this.speedMps * deltaSeconds * this.direction;
                     if (this.currentDistance >= this.maxDist) {
                         this.currentDistance = this.maxDist;
@@ -547,7 +559,7 @@
         }
 
         // ========================================================
-        // 5. AĞIN KURULMASI VE S41/S42 TEK YÖN KONUMLANDIRMA
+        // 5. AĞIN KURULMASI VE S41/S42 DAĞITIMI
         // ========================================================
         const fleet = [];
         const linePolylines = {};
@@ -583,10 +595,10 @@
             });
             badgesContainer.appendChild(badge);
 
-            // Hat Çizgisi
+            // Rota Çizgisi
             const poly = L.polyline(net.track.map(t => t.coords), {
                 color: lineData.color,
-                weight: lineData.type === 'BUS' ? 3.0 : 4.0,
+                weight: lineData.type === 'BUS' ? 3.5 : 4.0,
                 opacity: 0.85,
                 dashArray: lineData.type === 'BUS' ? '6, 6' : null
             }).addTo(map);
@@ -623,7 +635,6 @@
             const fullTripSeconds = (net.totalDistance / (lineData.speed * 1000 / 3600));
 
             if (lineData.isLoop) {
-                // S41 ve S42: SADECE TEK YÖNDE 7 TREN (ASLA KARŞI YÖN YOKTUR)
                 const totalRingTrains = 7;
                 for (let i = 0; i < totalRingTrains; i++) {
                     const staggerSeconds = (i / totalRingTrains) * fullTripSeconds;
@@ -637,16 +648,15 @@
                         net,
                         lineData.color,
                         calculatedDistance,
-                        1, // Sadece ileri yön
+                        1,
                         lineData.speed,
-                        true // isLoop kesinlikle true
+                        true
                     );
 
                     countSbahn++;
                     fleet.push(vehicle);
                 }
             } else {
-                // Çift Yönlü Normal Hatlar
                 const oneWaySeconds = fullTripSeconds;
                 const roundTripSeconds = oneWaySeconds * 2;
                 const trainsPerDir = Math.max(2, Math.round((oneWaySeconds / 60) / lineData.interval));
@@ -694,7 +704,7 @@
         document.getElementById('cnt-bus').innerText = countBus;
 
         // ========================================================
-        // 6. ODAKLAMA VE DESELECT YÖNETİMİ
+        // 6. ODAKLAMA VE SEÇİM TEMİZLEME
         // ========================================================
         function selectLine(key) {
             selectedLineKey = key;
@@ -775,7 +785,7 @@
             fleet.forEach(v => v.render());
         });
 
-        // PWA Yükleme Desteği
+        // PWA Kurulum Butonu
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
