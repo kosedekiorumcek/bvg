@@ -17,15 +17,16 @@
 
     <style>
         * { box-sizing: border-box; }
-        body {
+        html, body {
             margin: 0;
             padding: 0;
-            background-color: #e9ecef;
+            width: 100%;
+            height: 100%;
+            background-color: #f8fafc;
             color: #1e293b;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             flex-direction: column;
-            height: 100vh;
             overflow: hidden;
             -webkit-tap-highlight-color: transparent;
         }
@@ -35,10 +36,10 @@
             background: #ffffff;
             display: flex;
             flex-direction: column;
-            border-bottom: 2px solid #cbd5e1;
+            border-bottom: 1px solid #cbd5e1;
             z-index: 1000;
             gap: 6px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
 
         .stats-bar {
@@ -89,6 +90,7 @@
         #map {
             flex: 1;
             width: 100%;
+            height: 100%;
             background-color: #e2e8f0;
         }
 
@@ -101,12 +103,6 @@
             transition: fill 0.25s ease, opacity 0.25s ease;
         }
 
-        .leaflet-tile-pane {
-            filter: grayscale(1) brightness(1.05) contrast(0.85);
-            opacity: 0.85;
-        }
-
-        /* Bilgi Kartı (HUD) */
         .simple-hud {
             font-size: 13px;
             line-height: 1.4;
@@ -141,7 +137,7 @@
                 <span class="stat-val" id="cnt-sbahn">0</span>
             </div>
             <div class="stat-item">
-                <span>🚌 Otobüs (Bus):</span>
+                <span>🚌 Otobüs (M):</span>
                 <span class="stat-val" id="cnt-bus">0</span>
             </div>
             <div class="stat-item" id="active-focus-info" style="color: #64748b;">
@@ -158,30 +154,29 @@
 
     <script>
         // ========================================================
-        // 1. HARİTA ALTYAPISI (DÜZELTİLMİŞ OSM KATMANI)
+        // 1. HARİTA ALTYAPISI (GARANTİLİ CARTO POSITRON KATMANI)
         // ========================================================
         const map = L.map('map', {
             zoomSnap: 0.25,
             zoomDelta: 0.5
         }).setView([52.5160, 13.3400], 12.0);
 
-        // URL hatası düzeltildi: Artık harita eksiksiz yüklenir
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // Kesinlikle gri kalmayan, hafif ve net harita servisi
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             maxZoom: 19,
-            subdomains: ['a', 'b', 'c'],
-            attribution: '&copy; OpenStreetMap contributors'
+            subdomains: 'abcd',
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
         }).addTo(map);
 
-        // Odaklama / Karartma Durumu
         let selectedLineKey = null;
-        const FADED_COLOR = "#64748b";
-        const FADED_OPACITY = 0.22;
+        const FADED_COLOR = "#94a3b8";
+        const FADED_OPACITY = 0.20;
 
         // ========================================================
-        // 2. HAT VERİLERİ VE GÜZERGAHLAR
+        // 2. RESMİ RENK VE DOĞRULANMIŞ GÜZERGAH DÜĞÜMLERİ
         // ========================================================
-        const SBAHN_COLOR = "#00864e"; // Klasik S-Bahn Yeşili
-        const BUS_COLOR = "#b91c1c";   // Resmi BVG Kırmızısı
+        const SBAHN_COLOR = "#00864e"; // BVG / S-Bahn Yeşili
+        const BUS_COLOR = "#b91c1c";   // BVG Otobüs Kırmızısı
 
         const SHARED_U1_U3 = [
             { name: "Wittenbergplatz", coords: [52.5019, 13.3428] },
@@ -206,8 +201,8 @@
             [52.5106, 13.4347], [52.5058, 13.4494], [52.5031, 13.4692]
         ];
 
-        // Ringbahn Kapalı Çember Rotası (Saat Yönü)
-        const REAL_RINGBAHN_WAYPOINTS = [
+        // Ringbahn Dairesel Geometrisi (Tam Kapalı Çember)
+        const RING_NODES = [
             [52.4753, 13.3653], // Südkreuz
             [52.4792, 13.3517], // Schöneberg
             [52.4786, 13.3433], // Innsbrucker Platz
@@ -215,7 +210,7 @@
             [52.4800, 13.3117], // Heidelberger Platz
             [52.4961, 13.2889], // Halensee
             [52.5011, 13.2836], // Westkreuz
-            [52.5078, 13.2817], // Messe Nord/ICC
+            [52.5078, 13.2817], // Messe Nord
             [52.5181, 13.2847], // Westend
             [52.5303, 13.2997], // Jungfernheide
             [52.5344, 13.3289], // Beusselstraße
@@ -233,7 +228,7 @@
             [52.4698, 13.4429], // Neukölln
             [52.4678, 13.4314], // Hermannstraße
             [52.4708, 13.3856], // Tempelhof
-            [52.4753, 13.3653]  // Yeniden Südkreuz (Kapalı döngü)
+            [52.4753, 13.3653]  // Döngü tamamlandı
         ];
 
         // M45 Cadde Güzergahı
@@ -261,14 +256,14 @@
                 { name: "Osloer Straße", coords: [52.5569, 13.3735] }, { name: "Leopoldplatz", coords: [52.5469, 13.3594] }, { name: "Westhafen", coords: [52.5362, 13.3441] }, { name: "Zoologischer Garten", coords: [52.5074, 13.3327] }, { name: "Spichernstraße", coords: [52.4965, 13.3310] }, { name: "Rathaus Steglitz", coords: [52.4562, 13.3210] }
             ]},
 
-            // S-BAHN (Stadtbahn & Tek Yönlü Ringbahn)
+            // S-BAHN (Tek Yönlü Stadtbahn ve Ringbahn)
             "S5": { type: "S", color: SBAHN_COLOR, interval: 5.0, offset: 0, speed: 45, isLoop: false, rawWaypoints: [[52.5344, 13.1975], ...REAL_STADTBAHN_WAYPOINTS, [52.5858, 13.8822]], startTerm: "Spandau", endTerm: "Strausberg Nord" },
             "S7": { type: "S", color: SBAHN_COLOR, interval: 5.0, offset: 5, speed: 45, isLoop: false, rawWaypoints: [[52.3917, 13.0667], [52.4211, 13.1792], ...REAL_STADTBAHN_WAYPOINTS, [52.5714, 13.5653]], startTerm: "Potsdam Hbf", endTerm: "Ahrensfelde" },
             
-            // S41: Sadece Saat Yönü (Loop)
-            "S41": { type: "S", color: SBAHN_COLOR, interval: 4.5, offset: 3, speed: 40, isLoop: true, rawWaypoints: REAL_RINGBAHN_WAYPOINTS, startTerm: "Ringbahn ↻", endTerm: "S41 (Saat Yönü)" },
-            // S42: Sadece Saatin Tersi Yönü (Loop - Ters Sıralı)
-            "S42": { type: "S", color: SBAHN_COLOR, interval: 4.5, offset: -3, speed: 40, isLoop: true, rawWaypoints: [...REAL_RINGBAHN_WAYPOINTS].reverse(), startTerm: "Ringbahn ↺", endTerm: "S42 (Saat Tersi)" },
+            // S41: Sadece Saat Yönünde Döner
+            "S41": { type: "S", color: SBAHN_COLOR, interval: 4.5, offset: 3, speed: 40, isLoop: true, rawWaypoints: RING_NODES, startTerm: "Ringbahn ↻", endTerm: "S41 (Saat Yönü)" },
+            // S42: Sadece Saatin Tersi Yönünde Döner
+            "S42": { type: "S", color: SBAHN_COLOR, interval: 4.5, offset: -3, speed: 40, isLoop: true, rawWaypoints: [...RING_NODES].reverse(), startTerm: "Ringbahn ↺", endTerm: "S42 (Saat Tersi)" },
 
             // METROBUS M45
             "M45": { type: "BUS", color: BUS_COLOR, interval: 4.5, offset: 0, speed: 25, isLoop: false, rawWaypoints: REAL_M45_WAYPOINTS, startTerm: "Spandau, Johannesstift", endTerm: "Zoologischer Garten" }
@@ -380,7 +375,7 @@
         }
 
         // ========================================================
-        // 4. ARAÇ MOTORU (ÇEMBER DÖNGÜSÜ & YÖN KONTROLÜ)
+        // 4. ARAÇ MODELİ (KATI TEK YÖNLÜ RING MOTORU)
         // ========================================================
         class NetworkVehicle {
             constructor(id, lineKey, type, trackNetwork, color, initialDistance, direction, speedKmh = 33, isLoop = false) {
@@ -412,8 +407,9 @@
                 this.minDist = this.totalLength;
                 this.maxDist = this.network.totalDistance;
 
+                // Ring hatlarında yön HER ZAMAN +1'dir, tersine dönemez
+                this.direction = this.isLoop ? 1 : direction;
                 this.currentDistance = initialDistance;
-                this.direction = this.isLoop ? 1 : direction; // Ringbahn her zaman tek yönde gider
                 this.speedMps = (speedKmh * 1000) / 3600;
 
                 this.markers = [];
@@ -437,7 +433,7 @@
                                          fill="${this.originalColor}" 
                                          stroke="#ffffff" 
                                          stroke-width="1.2"
-                                         style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));" />
+                                         style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.35));" />
                                </svg>`
                     });
                     const marker = L.marker(this.network.track[0].coords, { icon: icon }).addTo(map);
@@ -465,7 +461,6 @@
 
             getPointAtDistance(d) {
                 let target = d;
-                // Ring döngüsü için sarma (wrap-around)
                 if (this.isLoop) {
                     target = ((target % this.network.totalDistance) + this.network.totalDistance) % this.network.totalDistance;
                 } else {
@@ -492,15 +487,16 @@
             }
 
             update(deltaSeconds) {
-                this.currentDistance += this.speedMps * deltaSeconds * this.direction;
-
                 if (this.isLoop) {
-                    // Ringbahn: Sona gelince başa sar ve aynı yönde devam et
+                    // Kesin tek yönlü dairesel akış
+                    this.direction = 1;
+                    this.currentDistance += this.speedMps * deltaSeconds;
                     if (this.currentDistance >= this.network.totalDistance) {
                         this.currentDistance = this.currentDistance % this.network.totalDistance;
                     }
                 } else {
-                    // Normal Hatlar: Uç noktalarda geri dön
+                    // Normal hatlar (uçlarda geri döner)
+                    this.currentDistance += this.speedMps * deltaSeconds * this.direction;
                     if (this.currentDistance >= this.maxDist) {
                         this.currentDistance = this.maxDist;
                         this.direction = -1;
@@ -551,7 +547,7 @@
         }
 
         // ========================================================
-        // 5. AĞIN KURULMASI VE S41/S42 TEK YÖN ATAMASI
+        // 5. AĞIN KURULMASI VE S41/S42 TEK YÖN KONUMLANDIRMA
         // ========================================================
         const fleet = [];
         const linePolylines = {};
@@ -574,7 +570,7 @@
                 net = buildExplicitTrack(lineData.rawWaypoints, lineData.offset, lineData.startTerm, lineData.endTerm);
             }
 
-            // Rozet
+            // Rozet Butonları
             const badge = document.createElement('span');
             badge.className = 'line-tag';
             badge.id = `badge-${key}`;
@@ -587,7 +583,7 @@
             });
             badgesContainer.appendChild(badge);
 
-            // Çizgi
+            // Hat Çizgisi
             const poly = L.polyline(net.track.map(t => t.coords), {
                 color: lineData.color,
                 weight: lineData.type === 'BUS' ? 3.0 : 4.0,
@@ -602,7 +598,7 @@
 
             linePolylines[key] = { polyline: poly, originalColor: lineData.color, type: lineData.type };
 
-            // U-Bahn Durak Noktaları
+            // U-Bahn Durakları
             if (lineData.stations) {
                 lineData.stations.forEach(st => {
                     const coordKey = `${st.coords[0].toFixed(4)},${st.coords[1].toFixed(4)}`;
@@ -623,12 +619,12 @@
                 });
             }
 
-            // Sefer ve Filo Hesaplama
+            // Sefer ve Filo Dağıtımı
             const fullTripSeconds = (net.totalDistance / (lineData.speed * 1000 / 3600));
 
             if (lineData.isLoop) {
-                // Ringbahn: Tüm trenler tek yönde eşit aralıklarla dairesel akar
-                const totalRingTrains = 8; // Çember üzerinde 8 aktif tren
+                // S41 ve S42: SADECE TEK YÖNDE 7 TREN (ASLA KARŞI YÖN YOKTUR)
+                const totalRingTrains = 7;
                 for (let i = 0; i < totalRingTrains; i++) {
                     const staggerSeconds = (i / totalRingTrains) * fullTripSeconds;
                     const timeInCycle = (globalEpochSeconds + staggerSeconds) % fullTripSeconds;
@@ -641,9 +637,9 @@
                         net,
                         lineData.color,
                         calculatedDistance,
-                        1, // Sadece tek yön (Saat yönü veya ters yön)
+                        1, // Sadece ileri yön
                         lineData.speed,
-                        true // isLoop = true
+                        true // isLoop kesinlikle true
                     );
 
                     countSbahn++;
@@ -698,7 +694,7 @@
         document.getElementById('cnt-bus').innerText = countBus;
 
         // ========================================================
-        // 6. ODAKLAMA VE DESELECT MOTORU
+        // 6. ODAKLAMA VE DESELECT YÖNETİMİ
         // ========================================================
         function selectLine(key) {
             selectedLineKey = key;
@@ -758,7 +754,7 @@
         }
 
         // ========================================================
-        // 7. ANİMASYON DÖNGÜSÜ
+        // 7. ANİMASYON MOTORU
         // ========================================================
         let lastTime = performance.now();
 
@@ -779,7 +775,7 @@
             fleet.forEach(v => v.render());
         });
 
-        // PWA Butonu
+        // PWA Yükleme Desteği
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
