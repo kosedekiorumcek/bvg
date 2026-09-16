@@ -740,16 +740,39 @@
             const trainsPerDir = Math.max(2, Math.round(oneWayMinutes / lineData.intervalMinutes));
             const totalTrains = trainsPerDir * 2;
 
+            // Trenlerin günün saatine göre dinamik konumlanması (Sürekli Canlı Zaman)
+            const currentTimeSeconds = (Date.now() / 1000); // Milisaniyeyi saniyeye çevir
+            const oneWaySeconds = oneWayMinutes * 60;       // Tek yön süresi (saniye)
+            const roundTripSeconds = oneWaySeconds * 2;     // Gidiş-dönüş tam tur süresi
+
             for (let i = 0; i < totalTrains; i++) {
-                const isForward = i % 2 === 0;
-                const offset = (Math.floor(i / 2) / trainsPerDir) * net.totalDistance;
+                // Her trenin sefer aralığına göre zaman kaydırması
+                const trainStaggerSeconds = (i / totalTrains) * roundTripSeconds;
+                
+                // Günün saniyesine trenin aralığını ekleyip tam tur döngüsüne oturtuyoruz
+                const elapsedInCycle = (currentTimeSeconds + trainStaggerSeconds) % roundTripSeconds;
+
+                let isForward = true;
+                let dynamicDistance = 0;
+
+                if (elapsedInCycle < oneWaySeconds) {
+                    // Gidiş yönü (0 -> Maksimum Mesafe)
+                    isForward = true;
+                    dynamicDistance = (elapsedInCycle / oneWaySeconds) * net.totalDistance;
+                } else {
+                    // Dönüş yönü (Maksimum Mesafe -> 0)
+                    isForward = false;
+                    const returnElapsed = elapsedInCycle - oneWaySeconds;
+                    dynamicDistance = net.totalDistance - ((returnElapsed / oneWaySeconds) * net.totalDistance);
+                }
+
                 fleet.push(new AdvancedLODTrain(
                     `${key}-${i+1}`,
                     key,
                     net,
                     lineData.color,
                     lineData.defaultCars,
-                    offset,
+                    dynamicDistance,
                     isForward ? 1 : -1
                 ));
             }
