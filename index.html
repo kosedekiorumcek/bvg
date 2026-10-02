@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Berlin U-Bahn & MetroBus M45 Canlı Radar Ağı</title>
+    <title>Berlin U-Bahn & MetroBus M45 - Canlı Sefer Takip Radarı</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="BVG Radar">
 
-    <!-- Leaflet Harita Kütüphanesi -->
+    <!-- Leaflet Harita Altyapısı -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
@@ -83,6 +83,8 @@
 
         .train-carriage, .bus-body {
             transition: transform 0.05s linear;
+            cursor: pointer;
+            pointer-events: auto !important;
         }
 
         .station-node {
@@ -94,6 +96,54 @@
             filter: grayscale(1) brightness(1.05) contrast(0.85);
             opacity: 0.85;
         }
+
+        /* Tıklama Bilgi Kartı Stilleri */
+        .vehicle-popup {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 12px;
+            line-height: 1.5;
+            min-width: 210px;
+        }
+        .vehicle-popup-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+        }
+        .vehicle-badge {
+            color: #ffffff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
+        }
+        .vehicle-status-tag {
+            font-size: 11px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .status-run { background: #dcfce7; color: #15803d; }
+        .status-dwell { background: #fef3c7; color: #b45309; }
+        .vehicle-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+        }
+        .vehicle-row-label {
+            color: #64748b;
+        }
+        .vehicle-row-val {
+            font-weight: 600;
+            color: #1e293b;
+            text-align: right;
+        }
+        .eta-val {
+            color: #0284c7;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -101,10 +151,10 @@
     <header>
         <div class="status-container">
             <span class="pulse-led" id="api-led"></span>
-            <span id="api-status">BVG Canlı Radar (Duvar Saati Senkronize)</span>
+            <span id="api-status">BVG Canlı Radar (Araca Tıklayarak Bilgi Alın)</span>
             <span id="fleet-count" style="color: #64748b; margin-left: 10px;">Hesaplanıyor...</span>
+            <span id="dwell-count" style="color: #d97706; margin-left: 10px; font-weight: bold;">0 Durakta</span>
             <span id="live-clock" style="color: #0284c7; margin-left: 10px; font-weight: bold;">--:--:--</span>
-            <span id="zoom-indicator" style="color: #64748b; margin-left: 10px;">Zoom: 12.5</span>
         </div>
         <div class="badges-wrapper" id="badges-container"></div>
     </header>
@@ -130,183 +180,67 @@
         }).addTo(map);
 
         // ========================================================
-        // 2. KESİN METRO İSTASYONLARI
+        // 2. KESİN METRO İSTASYON VERİTABANI
         // ========================================================
         const KML_STATIONS = {
-            "Gleisdreieck": [52.4994718, 13.3741785],
-            "Nollendorfplatz": [52.4994, 13.3539],
-            "Wittenbergplatz": [52.501791, 13.3429215],
-            "Görlitzer Bahnhof": [52.4992523, 13.4280303],
-            "Kurfürstenstraße": [52.499673, 13.3627008],
-            "Prinzenstraße": [52.4983849, 13.4057781],
-            "Schlesisches Tor": [52.5007551, 13.4412187],
-            "Hallesches Tor": [52.4977216, 13.390864],
-            "Möckernbrücke": [52.4990, 13.3828],
-            "Kottbusser Tor": [52.4989739, 13.4182878],
-            "Warschauer Straße": [52.5050947, 13.4491206],
-            "Kurfürstendamm": [52.5036775, 13.3313194],
-            "Uhlandstraße": [52.5027996, 13.326866],
-            "Bülowstraße": [52.4975065, 13.3634235],
-            "Deutsche Oper": [52.5117694, 13.3095486],
-            "Eberswalder Straße": [52.5414, 13.4122],
-            "Ernst-Reuter-Platz": [52.5128, 13.3219],
-            "Hausvogteiplatz": [52.5133392, 13.3955842],
-            "Kaiserdamm": [52.5100, 13.2825],
-            "Klosterstraße": [52.5171446, 13.4124146],
-            "Mendelssohn-Bartholdy-Park": [52.5034163, 13.3747429],
-            "Mohrenstraße": [52.5114715, 13.3833846],
-            "Märkisches Museum": [52.5119388, 13.4087065],
-            "Neu-Westend": [52.5160155, 13.2604563],
-            "Olympia-Stadion": [52.5173377, 13.2500429],
-            "Pankow": [52.5669609, 13.4121794],
-            "Potsdamer Platz": [52.508714, 13.3762721],
-            "Rosa-Luxemburg-Platz": [52.5281695, 13.4101283],
-            "Ruhleben": [52.5256196, 13.241303],
-            "Schönhauser Allee": [52.5493044, 13.4135951],
-            "Senefelderplatz": [52.5325259, 13.4125858],
-            "Sophie-Charlotte-Platz": [52.5109498, 13.2970763],
-            "Spittelmarkt": [52.5113612, 13.4020599],
-            "Theodor-Heuss-Platz": [52.5095487, 13.2725636],
-            "Alexanderplatz": [52.5215, 13.4115],
-            "Stadtmitte": [52.5120498, 13.389597],
-            "Bismarckstraße": [52.5114622, 13.305203],
-            "Zoologischer Garten": [52.5072, 13.3325],
-            "Vinetastraße": [52.5592, 13.4132348],
-            "Augsburger Straße": [52.4993991, 13.3353271],
-            "Breitenbachplatz": [52.4669654, 13.3089652],
-            "Dahlem-Dorf": [52.4575646, 13.2899257],
-            "Freie Universität (Thielplatz)": [52.4509358, 13.2816202],
-            "Heidelberger Platz": [52.4801045, 13.3122364],
-            "Hohenzollernplatz": [52.4936518, 13.3236478],
-            "Krumme Lanke": [52.4428806, 13.2406713],
-            "Onkel Toms Hütte": [52.4502215, 13.2543081],
-            "Oskar-Helene-Heim": [52.4502812, 13.2697751],
-            "Podbielskiallee": [52.4643046, 13.2964223],
-            "Rüdesheimer Platz": [52.4727766, 13.3143502],
-            "Fehrbelliner Platz": [52.490392, 13.3141789],
-            "Spichernstraße": [52.4963342, 13.3307142],
-            "Innsbrucker Platz": [52.4781159, 13.3440939],
-            "Rathaus Schöneberg": [52.4831, 13.341964],
-            "Bayerischer Platz": [52.4885211, 13.3400644],
-            "Viktoria-Luise-Platz": [52.4961131, 13.3430957],
-            "Biesdorf-Süd": [52.4997884, 13.5471036],
-            "Brandenburger Tor": [52.5164, 13.3808],
-            "Bundestag": [52.5195561, 13.3723704],
-            "Cottbusser Platz": [52.5338345, 13.5964267],
-            "Elsterwerdaer Platz": [52.5050, 13.5606],
-            "Frankfurter Allee": [52.5136199, 13.4752038],
-            "Frankfurter Tor": [52.5158, 13.4539],
-            "Friedrichsfelde": [52.5054082, 13.5135567],
-            "Hauptbahnhof": [52.5249603, 13.3691356],
-            "Hellersdorf": [52.5362407, 13.6050585],
-            "Hönow": [52.5383222, 13.6334065],
-            "Kaulsdorf-Nord": [52.5208846, 13.5889541],
-            "Kienberg (Gärten der Welt)": [52.5285123, 13.5905528],
-            "Lichtenberg": [52.5103, 13.4975],
-            "Louis-Lewin-Straße": [52.5389653, 13.6182889],
-            "Magdalenenstraße": [52.51234, 13.4882235],
-            "Museumsinsel": [52.5174807, 13.399866],
-            "Rotes Rathaus": [52.5188543, 13.4084982],
-            "Samariterstraße": [52.5148498, 13.4631654],
-            "Schillingstraße": [52.5202834, 13.421818],
-            "Strausberger Platz": [52.5180021, 13.4322043],
-            "Tierpark": [52.4969029, 13.5237721],
-            "Unter den Linden": [52.5169, 13.3889],
-            "Weberwiese": [52.5168436, 13.4432735],
-            "Wuhletal": [52.5125, 13.5750],
-            "Afrikanische Straße": [52.5604239, 13.3342923],
-            "Alt-Mariendorf": [52.4390329, 13.3878644],
-            "Alt-Tegel": [52.5896628, 13.2834923],
-            "Alt-Tempelhof": [52.4658628, 13.385564],
-            "Borsigwerke": [52.5829223, 13.2895878],
-            "Friedrichstraße": [52.5204828, 13.3881875],
-            "Holzhauser Straße": [52.5757076, 13.2960629],
-            "Kaiserin-Augusta-Straße": [52.4600007, 13.3846678],
-            "Kochstraße (Checkpoint Charlie)": [52.5066326, 13.3905142],
-            "Kurt-Schumacher-Platz": [52.5631956, 13.3270219],
-            "Naturkundemuseum": [52.5312657, 13.3821678],
-            "Oranienburger Tor": [52.525464, 13.3873498],
-            "Otisstraße": [52.5711, 13.3028322],
-            "Paradestraße": [52.4781523, 13.3858417],
-            "Platz der Luftbrücke": [52.4848913, 13.385918],
-            "Rehberge": [52.5561717, 13.3416949],
-            "Reinickendorfer Straße": [52.5402287, 13.3699567],
-            "Scharnweberstraße": [52.566788, 13.3126179],
-            "Schwartzkopffstraße": [52.5354438, 13.3769215],
-            "Seestraße": [52.5498044, 13.3530575],
-            "Tempelhof": [52.4706425, 13.3856],
-            "Mehringdamm": [52.4945467, 13.3888146],
-            "Leopoldplatz": [52.5463803, 13.3591249],
-            "Ullsteinstraße": [52.4526846, 13.3844897],
-            "Wedding": [52.5423501, 13.3661962],
-            "Westphalweg": [52.4457984, 13.3857142],
-            "Adenauerplatz": [52.5000, 13.3072],
-            "Altstadt Spandau": [52.5384005, 13.2069947],
-            "Blaschkoallee": [52.4526438, 13.4489482],
-            "Blissestraße": [52.4864555, 13.3204179],
-            "Britz-Süd": [52.4369384, 13.4484871],
-            "Eisenacher Straße": [52.4895568, 13.3505785],
-            "Gneisenaustraße": [52.4912563, 13.3957996],
-            "Grenzallee": [52.4634798, 13.4442391],
-            "Halemweg": [52.536596, 13.2865077],
-            "Haselhorst": [52.5384238, 13.231985],
-            "Jakob-Kaiser-Platz": [52.536458, 13.2931279],
-            "Johannisthaler Chaussee": [52.4293841, 13.4534275],
-            "Jungfernheide": [52.5306002, 13.3009227],
-            "Karl-Marx-Straße": [52.4760863, 13.4393717],
-            "Kleistpark": [52.4906422, 13.3601502],
-            "Konstanzer Straße": [52.4938384, 13.3098127],
-            "Lipschitzallee": [52.4243823, 13.4631713],
-            "Mierendorffplatz": [52.5258909, 13.30603],
-            "Neukölln": [52.4691248, 13.4418344],
-            "Parchimer Allee": [52.4446738, 13.4498117],
-            "Paulsternstraße": [52.5380153, 13.2477257],
-            "Rathaus Neukölln": [52.481479, 13.4343506],
-            "Rathaus Spandau": [52.5352411, 13.1998387],
-            "Richard-Wagner-Platz": [52.5172771, 13.3065858],
-            "Rohrdamm": [52.5368568, 13.2617275],
-            "Rudow": [52.4161654, 13.495279],
-            "Siemensdamm": [52.5365699, 13.2726129],
-            "Südstern": [52.4889779, 13.4076069],
-            "Hermannplatz": [52.4864813, 13.4243352],
-            "Berliner Straße": [52.487298, 13.3309869],
-            "Wilmersdorfer Straße": [52.5064, 13.3067],
-            "Wutzkyallee": [52.4231683, 13.4745816],
-            "Yorckstraße": [52.4923819, 13.3717978],
-            "Zitadelle": [52.5374541, 13.217564],
-            "Zwickauer Damm": [52.4231156, 13.4840717],
-            "Bernauer Straße": [52.5381493, 13.3960241],
-            "Boddinstraße": [52.4802614, 13.4251619],
-            "Franz-Neumann-Platz (Am Schäfersee)": [52.5635191, 13.3642967],
-            "Gesundbrunnen": [52.5485542, 13.3880099],
-            "Heinrich-Heine-Straße": [52.5108746, 13.416379],
-            "Hermannstraße": [52.4675065, 13.431282],
-            "Jannowitzbrücke": [52.5147581, 13.4179391],
-            "Karl-Bonhoeffer-Nervenklinik": [52.5777349, 13.3294259],
-            "Leinestraße": [52.4733936, 13.4280957],
-            "Lindauer Allee": [52.5753252, 13.3387709],
-            "Moritzplatz": [52.5036, 13.4106],
-            "Pankstraße": [52.5522417, 13.3814966],
-            "Paracelsus-Bad": [52.5744551, 13.3470866],
-            "Rathaus Reinickendorf": [52.5887045, 13.3249846],
-            "Residenzstraße": [52.5707976, 13.3606275],
-            "Rosenthaler Platz": [52.5296478, 13.4012931],
-            "Schönleinstraße": [52.4926754, 13.4221897],
-            "Osloer Straße": [52.5565956, 13.3732567],
-            "Voltastraße": [52.5419, 13.3931],
-            "Weinmeisterstraße": [52.5254047, 13.4050322],
-            "Wittenau": [52.5969731, 13.334083],
-            "Amrumer Straße": [52.5421217, 13.3494417],
-            "Birkenstraße": [52.5322259, 13.3413781],
-            "Bundesplatz": [52.4786386, 13.3284931],
-            "Friedrich-Wilhelm-Platz": [52.4714164, 13.3283579],
-            "Güntzelstraße": [52.4920146, 13.3308215],
-            "Hansaplatz": [52.5184398, 13.3422],
-            "Nauener Platz": [52.5513869, 13.3672579],
-            "Rathaus Steglitz": [52.4568584, 13.3206486],
-            "Schloßstraße": [52.4612053, 13.3248502],
-            "Turmstraße": [52.5258781, 13.3413636],
-            "Walther-Schreiber-Platz": [52.4652222, 13.328315],
+            "Gleisdreieck": [52.4994718, 13.3741785], "Nollendorfplatz": [52.4994, 13.3539], "Wittenbergplatz": [52.501791, 13.3429215],
+            "Görlitzer Bahnhof": [52.4992523, 13.4280303], "Kurfürstenstraße": [52.499673, 13.3627008], "Prinzenstraße": [52.4983849, 13.4057781],
+            "Schlesisches Tor": [52.5007551, 13.4412187], "Hallesches Tor": [52.4977216, 13.390864], "Möckernbrücke": [52.4990, 13.3828],
+            "Kottbusser Tor": [52.4989739, 13.4182878], "Warschauer Straße": [52.5050947, 13.4491206], "Kurfürstendamm": [52.5036775, 13.3313194],
+            "Uhlandstraße": [52.5027996, 13.326866], "Bülowstraße": [52.4975065, 13.3634235], "Deutsche Oper": [52.5117694, 13.3095486],
+            "Eberswalder Straße": [52.5414, 13.4122], "Ernst-Reuter-Platz": [52.5128, 13.3219], "Hausvogteiplatz": [52.5133392, 13.3955842],
+            "Kaiserdamm": [52.5100, 13.2825], "Klosterstraße": [52.5171446, 13.4124146], "Mendelssohn-Bartholdy-Park": [52.5034163, 13.3747429],
+            "Mohrenstraße": [52.5114715, 13.3833846], "Märkisches Museum": [52.5119388, 13.4087065], "Neu-Westend": [52.5160155, 13.2604563],
+            "Olympia-Stadion": [52.5173377, 13.2500429], "Pankow": [52.5669609, 13.4121794], "Potsdamer Platz": [52.508714, 13.3762721],
+            "Rosa-Luxemburg-Platz": [52.5281695, 13.4101283], "Ruhleben": [52.5256196, 13.241303], "Schönhauser Allee": [52.5493044, 13.4135951],
+            "Senefelderplatz": [52.5325259, 13.4125858], "Sophie-Charlotte-Platz": [52.5109498, 13.2970763], "Spittelmarkt": [52.5113612, 13.4020599],
+            "Theodor-Heuss-Platz": [52.5095487, 13.2725636], "Alexanderplatz": [52.5215, 13.4115], "Stadtmitte": [52.5120498, 13.389597],
+            "Bismarckstraße": [52.5114622, 13.305203], "Zoologischer Garten": [52.5072, 13.3325], "Vinetastraße": [52.5592, 13.4132348],
+            "Augsburger Straße": [52.4993991, 13.3353271], "Breitenbachplatz": [52.4669654, 13.3089652], "Dahlem-Dorf": [52.4575646, 13.2899257],
+            "Freie Universität (Thielplatz)": [52.4509358, 13.2816202], "Heidelberger Platz": [52.4801045, 13.3122364], "Hohenzollernplatz": [52.4936518, 13.3236478],
+            "Krumme Lanke": [52.4428806, 13.2406713], "Onkel Toms Hütte": [52.4502215, 13.2543081], "Oskar-Helene-Heim": [52.4502812, 13.2697751],
+            "Podbielskiallee": [52.4643046, 13.2964223], "Rüdesheimer Platz": [52.4727766, 13.3143502], "Fehrbelliner Platz": [52.490392, 13.3141789],
+            "Spichernstraße": [52.4963342, 13.3307142], "Innsbrucker Platz": [52.4781159, 13.3440939], "Rathaus Schöneberg": [52.4831, 13.341964],
+            "Bayerischer Platz": [52.4885211, 13.3400644], "Viktoria-Luise-Platz": [52.4961131, 13.3430957], "Biesdorf-Süd": [52.4997884, 13.5471036],
+            "Brandenburger Tor": [52.5164, 13.3808], "Bundestag": [52.5195561, 13.3723704], "Cottbusser Platz": [52.5338345, 13.5964267],
+            "Elsterwerdaer Platz": [52.5050, 13.5606], "Frankfurter Allee": [52.5136199, 13.4752038], "Frankfurter Tor": [52.5158, 13.4539],
+            "Friedrichsfelde": [52.5054082, 13.5135567], "Hauptbahnhof": [52.5249603, 13.3691356], "Hellersdorf": [52.5362407, 13.6050585],
+            "Hönow": [52.5383222, 13.6334065], "Kaulsdorf-Nord": [52.5208846, 13.5889541], "Kienberg (Gärten der Welt)": [52.5285123, 13.5905528],
+            "Lichtenberg": [52.5103, 13.4975], "Louis-Lewin-Straße": [52.5389653, 13.6182889], "Magdalenenstraße": [52.51234, 13.4882235],
+            "Museumsinsel": [52.5174807, 13.399866], "Rotes Rathaus": [52.5188543, 13.4084982], "Samariterstraße": [52.5148498, 13.4631654],
+            "Schillingstraße": [52.5202834, 13.421818], "Strausberger Platz": [52.5180021, 13.4322043], "Tierpark": [52.4969029, 13.5237721],
+            "Unter den Linden": [52.5169, 13.3889], "Weberwiese": [52.5168436, 13.4432735], "Wuhletal": [52.5125, 13.5750],
+            "Afrikanische Straße": [52.5604239, 13.3342923], "Alt-Mariendorf": [52.4390329, 13.3878644], "Alt-Tegel": [52.5896628, 13.2834923],
+            "Alt-Tempelhof": [52.4658628, 13.385564], "Borsigwerke": [52.5829223, 13.2895878], "Friedrichstraße": [52.5204828, 13.3881875],
+            "Holzhauser Straße": [52.5757076, 13.2960629], "Kaiserin-Augusta-Straße": [52.4600007, 13.3846678], "Kochstraße (Checkpoint Charlie)": [52.5066326, 13.3905142],
+            "Kurt-Schumacher-Platz": [52.5631956, 13.3270219], "Naturkundemuseum": [52.5312657, 13.3821678], "Oranienburger Tor": [52.525464, 13.3873498],
+            "Otisstraße": [52.5711, 13.3028322], "Paradestraße": [52.4781523, 13.3858417], "Platz der Luftbrücke": [52.4848913, 13.385918],
+            "Rehberge": [52.5561717, 13.3416949], "Reinickendorfer Straße": [52.5402287, 13.3699567], "Scharnweberstraße": [52.566788, 13.3126179],
+            "Schwartzkopffstraße": [52.5354438, 13.3769215], "Seestraße": [52.5498044, 13.3530575], "Tempelhof": [52.4706425, 13.3856],
+            "Mehringdamm": [52.4945467, 13.3888146], "Leopoldplatz": [52.5463803, 13.3591249], "Ullsteinstraße": [52.4526846, 13.3844897],
+            "Wedding": [52.5423501, 13.3661962], "Westphalweg": [52.4457984, 13.3857142], "Adenauerplatz": [52.5000, 13.3072],
+            "Altstadt Spandau": [52.5384005, 13.2069947], "Blaschkoallee": [52.4526438, 13.4489482], "Blissestraße": [52.4864555, 13.3204179],
+            "Britz-Süd": [52.4369384, 13.4484871], "Eisenacher Straße": [52.4895568, 13.3505785], "Gneisenaustraße": [52.4912563, 13.3957996],
+            "Grenzallee": [52.4634798, 13.4442391], "Halemweg": [52.536596, 13.2865077], "Haselhorst": [52.5384238, 13.231985],
+            "Jakob-Kaiser-Platz": [52.536458, 13.2931279], "Johannisthaler Chaussee": [52.4293841, 13.4534275], "Jungfernheide": [52.5306002, 13.3009227],
+            "Karl-Marx-Straße": [52.4760863, 13.4393717], "Kleistpark": [52.4906422, 13.3601502], "Konstanzer Straße": [52.4938384, 13.3098127],
+            "Lipschitzallee": [52.4243823, 13.4631713], "Mierendorffplatz": [52.5258909, 13.30603], "Neukölln": [52.4691248, 13.4418344],
+            "Parchimer Allee": [52.4446738, 13.4498117], "Paulsternstraße": [52.5380153, 13.2477257], "Rathaus Neukölln": [52.481479, 13.4343506],
+            "Rathaus Spandau": [52.5352411, 13.1998387], "Richard-Wagner-Platz": [52.5172771, 13.3065858], "Rohrdamm": [52.5368568, 13.2617275],
+            "Rudow": [52.4161654, 13.495279], "Siemensdamm": [52.5365699, 13.2726129], "Südstern": [52.4889779, 13.4076069],
+            "Hermannplatz": [52.4864813, 13.4243352], "Berliner Straße": [52.487298, 13.3309869], "Wilmersdorfer Straße": [52.5064, 13.3067],
+            "Wutzkyallee": [52.4231683, 13.4745816], "Yorckstraße": [52.4923819, 13.3717978], "Zitadelle": [52.5374541, 13.217564],
+            "Zwickauer Damm": [52.4231156, 13.4840717], "Bernauer Straße": [52.5381493, 13.3960241], "Boddinstraße": [52.4802614, 13.4251619],
+            "Franz-Neumann-Platz (Am Schäfersee)": [52.5635191, 13.3642967], "Gesundbrunnen": [52.5485542, 13.3880099], "Heinrich-Heine-Straße": [52.5108746, 13.416379],
+            "Hermannstraße": [52.4675065, 13.431282], "Jannowitzbrücke": [52.5147581, 13.4179391], "Karl-Bonhoeffer-Nervenklinik": [52.5777349, 13.3294259],
+            "Leinestraße": [52.4733936, 13.4280957], "Lindauer Allee": [52.5753252, 13.3387709], "Moritzplatz": [52.5036, 13.4106],
+            "Pankstraße": [52.5522417, 13.3814966], "Paracelsus-Bad": [52.5744551, 13.3470866], "Rathaus Reinickendorf": [52.5887045, 13.3249846],
+            "Residenzstraße": [52.5707976, 13.3606275], "Rosenthaler Platz": [52.5296478, 13.4012931], "Schönleinstraße": [52.4926754, 13.4221897],
+            "Osloer Straße": [52.5565956, 13.3732567], "Voltastraße": [52.5419, 13.3931], "Weinmeisterstraße": [52.5254047, 13.4050322],
+            "Wittenau": [52.5969731, 13.334083], "Amrumer Straße": [52.5421217, 13.3494417], "Birkenstraße": [52.5322259, 13.3413781],
+            "Bundesplatz": [52.4786386, 13.3284931], "Friedrich-Wilhelm-Platz": [52.4714164, 13.3283579], "Güntzelstraße": [52.4920146, 13.3308215],
+            "Hansaplatz": [52.5184398, 13.3422], "Nauener Platz": [52.5513869, 13.3672579], "Rathaus Steglitz": [52.4568584, 13.3206486],
+            "Schloßstraße": [52.4612053, 13.3248502], "Turmstraße": [52.5258781, 13.3413636], "Walther-Schreiber-Platz": [52.4652222, 13.328315],
             "Westhafen": [52.5360869, 13.3437073]
         };
 
@@ -317,110 +251,26 @@
         // ========================================================
         // 3. HAT YAPILANDIRMASI
         // ========================================================
-        const SHARED_U1_U3_NAMES = [
+        const SHARED_U1_U3 = [
             "Wittenbergplatz", "Nollendorfplatz", "Kurfürstenstraße", "Gleisdreieck",
             "Möckernbrücke", "Hallesches Tor", "Prinzenstraße", "Kottbusser Tor",
             "Görlitzer Bahnhof", "Schlesisches Tor", "Warschauer Straße"
         ];
 
         const U_LINES = {
-            "U1": {
-                color: "#46963c", intervalMinutes: 4.5, offsetMeters: 5,
-                stations: ["Uhlandstraße", "Kurfürstendamm", ...SHARED_U1_U3_NAMES].map(getStation)
-            },
-            "U2": {
-                color: "#d63815", intervalMinutes: 4, offsetMeters: 0,
-                stations: [
-                    "Ruhleben", "Olympia-Stadion", "Neu-Westend", "Theodor-Heuss-Platz",
-                    "Kaiserdamm", "Sophie-Charlotte-Platz", "Bismarckstraße", "Deutsche Oper",
-                    "Ernst-Reuter-Platz", "Zoologischer Garten", "Wittenbergplatz", "Nollendorfplatz",
-                    "Bülowstraße", "Gleisdreieck", "Mendelssohn-Bartholdy-Park", "Potsdamer Platz",
-                    "Mohrenstraße", "Stadtmitte", "Hausvogteiplatz", "Spittelmarkt",
-                    "Märkisches Museum", "Klosterstraße", "Alexanderplatz", "Rosa-Luxemburg-Platz",
-                    "Senefelderplatz", "Eberswalder Straße", "Schönhauser Allee", "Vinetastraße", "Pankow"
-                ].map(getStation)
-            },
-            "U3": {
-                color: "#0f5a2b", intervalMinutes: 5, offsetMeters: -5,
-                stations: [
-                    "Krumme Lanke", "Onkel Toms Hütte", "Oskar-Helene-Heim", "Freie Universität (Thielplatz)",
-                    "Dahlem-Dorf", "Podbielskiallee", "Breitenbachplatz", "Rüdesheimer Platz",
-                    "Heidelberger Platz", "Fehrbelliner Platz", "Hohenzollernplatz", "Spichernstraße",
-                    "Augsburger Straße", ...SHARED_U1_U3_NAMES
-                ].map(getStation)
-            },
-            "U4": {
-                color: "#e6c700", intervalMinutes: 6, offsetMeters: 0,
-                stations: [
-                    "Nollendorfplatz", "Viktoria-Luise-Platz", "Bayerischer Platz",
-                    "Rathaus Schöneberg", "Innsbrucker Platz"
-                ].map(getStation)
-            },
-            "U5": {
-                color: "#734825", intervalMinutes: 4.5, offsetMeters: 0,
-                stations: [
-                    "Hauptbahnhof", "Bundestag", "Brandenburger Tor", "Unter den Linden",
-                    "Museumsinsel", "Rotes Rathaus", "Alexanderplatz", "Schillingstraße",
-                    "Strausberger Platz", "Weberwiese", "Frankfurter Tor", "Samariterstraße",
-                    "Frankfurter Allee", "Magdalenenstraße", "Lichtenberg", "Friedrichsfelde",
-                    "Tierpark", "Biesdorf-Süd", "Elsterwerdaer Platz", "Wuhletal",
-                    "Kaulsdorf-Nord", "Kienberg (Gärten der Welt)", "Cottbusser Platz",
-                    "Hellersdorf", "Louis-Lewin-Straße", "Hönow"
-                ].map(getStation)
-            },
-            "U6": {
-                color: "#7e5e9f", intervalMinutes: 4, offsetMeters: 0,
-                stations: [
-                    "Alt-Tegel", "Borsigwerke", "Holzhauser Straße", "Otisstraße",
-                    "Scharnweberstraße", "Kurt-Schumacher-Platz", "Afrikanische Straße",
-                    "Rehberge", "Seestraße", "Leopoldplatz", "Wedding", "Reinickendorfer Straße",
-                    "Schwartzkopffstraße", "Naturkundemuseum", "Oranienburger Tor", "Friedrichstraße",
-                    "Unter den Linden", "Stadtmitte", "Kochstraße (Checkpoint Charlie)",
-                    "Hallesches Tor", "Mehringdamm", "Platz der Luftbrücke", "Paradestraße",
-                    "Tempelhof", "Alt-Tempelhof", "Kaiserin-Augusta-Straße", "Ullsteinstraße",
-                    "Westphalweg", "Alt-Mariendorf"
-                ].map(getStation)
-            },
-            "U7": {
-                color: "#1184b2", intervalMinutes: 3.75, offsetMeters: 0,
-                stations: [
-                    "Rathaus Spandau", "Altstadt Spandau", "Zitadelle", "Haselhorst",
-                    "Paulsternstraße", "Rohrdamm", "Siemensdamm", "Halemweg",
-                    "Jakob-Kaiser-Platz", "Jungfernheide", "Mierendorffplatz", "Richard-Wagner-Platz",
-                    "Bismarckstraße", "Wilmersdorfer Straße", "Adenauerplatz", "Konstanzer Straße",
-                    "Fehrbelliner Platz", "Blissestraße", "Berliner Straße", "Bayerischer Platz",
-                    "Eisenacher Straße", "Kleistpark", "Yorckstraße", "Möckernbrücke",
-                    "Mehringdamm", "Gneisenaustraße", "Südstern", "Hermannplatz",
-                    "Rathaus Neukölln", "Karl-Marx-Straße", "Neukölln", "Grenzallee",
-                    "Blaschkoallee", "Parchimer Allee", "Britz-Süd", "Johannisthaler Chaussee",
-                    "Lipschitzallee", "Wutzkyallee", "Zwickauer Damm", "Rudow"
-                ].map(getStation)
-            },
-            "U8": {
-                color: "#034e7e", intervalMinutes: 4.5, offsetMeters: 0,
-                stations: [
-                    "Wittenau", "Rathaus Reinickendorf", "Karl-Bonhoeffer-Nervenklinik",
-                    "Lindauer Allee", "Paracelsus-Bad", "Residenzstraße", "Franz-Neumann-Platz (Am Schäfersee)",
-                    "Osloer Straße", "Pankstraße", "Gesundbrunnen", "Voltastraße",
-                    "Bernauer Straße", "Rosenthaler Platz", "Weinmeisterstraße", "Alexanderplatz",
-                    "Jannowitzbrücke", "Heinrich-Heine-Straße", "Moritzplatz", "Kottbusser Tor",
-                    "Schönleinstraße", "Hermannplatz", "Boddinstraße", "Leinestraße", "Hermannstraße"
-                ].map(getStation)
-            },
-            "U9": {
-                color: "#e6b800", intervalMinutes: 4, offsetMeters: 0,
-                stations: [
-                    "Osloer Straße", "Nauener Platz", "Leopoldplatz", "Amrumer Straße",
-                    "Westhafen", "Birkenstraße", "Turmstraße", "Hansaplatz",
-                    "Zoologischer Garten", "Kurfürstendamm", "Spichernstraße", "Güntzelstraße",
-                    "Berliner Straße", "Bundesplatz", "Friedrich-Wilhelm-Platz",
-                    "Walther-Schreiber-Platz", "Schloßstraße", "Rathaus Steglitz"
-                ].map(getStation)
-            }
+            "U1": { color: "#46963c", intervalMinutes: 4.5, offsetMeters: 5, stations: ["Uhlandstraße", "Kurfürstendamm", ...SHARED_U1_U3].map(getStation) },
+            "U2": { color: "#d63815", intervalMinutes: 4, offsetMeters: 0, stations: ["Ruhleben", "Olympia-Stadion", "Neu-Westend", "Theodor-Heuss-Platz", "Kaiserdamm", "Sophie-Charlotte-Platz", "Bismarckstraße", "Deutsche Oper", "Ernst-Reuter-Platz", "Zoologischer Garten", "Wittenbergplatz", "Nollendorfplatz", "Bülowstraße", "Gleisdreieck", "Mendelssohn-Bartholdy-Park", "Potsdamer Platz", "Mohrenstraße", "Stadtmitte", "Hausvogteiplatz", "Spittelmarkt", "Märkisches Museum", "Klosterstraße", "Alexanderplatz", "Rosa-Luxemburg-Platz", "Senefelderplatz", "Eberswalder Straße", "Schönhauser Allee", "Vinetastraße", "Pankow"].map(getStation) },
+            "U3": { color: "#0f5a2b", intervalMinutes: 5, offsetMeters: -5, stations: ["Krumme Lanke", "Onkel Toms Hütte", "Oskar-Helene-Heim", "Freie Universität (Thielplatz)", "Dahlem-Dorf", "Podbielskiallee", "Breitenbachplatz", "Rüdesheimer Platz", "Heidelberger Platz", "Fehrbelliner Platz", "Hohenzollernplatz", "Spichernstraße", "Augsburger Straße", ...SHARED_U1_U3].map(getStation) },
+            "U4": { color: "#e6c700", intervalMinutes: 6, offsetMeters: 0, stations: ["Nollendorfplatz", "Viktoria-Luise-Platz", "Bayerischer Platz", "Rathaus Schöneberg", "Innsbrucker Platz"].map(getStation) },
+            "U5": { color: "#734825", intervalMinutes: 4.5, offsetMeters: 0, stations: ["Hauptbahnhof", "Bundestag", "Brandenburger Tor", "Unter den Linden", "Museumsinsel", "Rotes Rathaus", "Alexanderplatz", "Schillingstraße", "Strausberger Platz", "Weberwiese", "Frankfurter Tor", "Samariterstraße", "Frankfurter Allee", "Magdalenenstraße", "Lichtenberg", "Friedrichsfelde", "Tierpark", "Biesdorf-Süd", "Elsterwerdaer Platz", "Wuhletal", "Kaulsdorf-Nord", "Kienberg (Gärten der Welt)", "Cottbusser Platz", "Hellersdorf", "Louis-Lewin-Straße", "Hönow"].map(getStation) },
+            "U6": { color: "#7e5e9f", intervalMinutes: 4, offsetMeters: 0, stations: ["Alt-Tegel", "Borsigwerke", "Holzhauser Straße", "Otisstraße", "Scharnweberstraße", "Kurt-Schumacher-Platz", "Afrikanische Straße", "Rehberge", "Seestraße", "Leopoldplatz", "Wedding", "Reinickendorfer Straße", "Schwartzkopffstraße", "Naturkundemuseum", "Oranienburger Tor", "Friedrichstraße", "Unter den Linden", "Stadtmitte", "Kochstraße (Checkpoint Charlie)", "Hallesches Tor", "Mehringdamm", "Platz der Luftbrücke", "Paradestraße", "Tempelhof", "Alt-Tempelhof", "Kaiserin-Augusta-Straße", "Ullsteinstraße", "Westphalweg", "Alt-Mariendorf"].map(getStation) },
+            "U7": { color: "#1184b2", intervalMinutes: 3.75, offsetMeters: 0, stations: ["Rathaus Spandau", "Altstadt Spandau", "Zitadelle", "Haselhorst", "Paulsternstraße", "Rohrdamm", "Siemensdamm", "Halemweg", "Jakob-Kaiser-Platz", "Jungfernheide", "Mierendorffplatz", "Richard-Wagner-Platz", "Bismarckstraße", "Wilmersdorfer Straße", "Adenauerplatz", "Konstanzer Straße", "Fehrbelliner Platz", "Blissestraße", "Berliner Straße", "Bayerischer Platz", "Eisenacher Straße", "Kleistpark", "Yorckstraße", "Möckernbrücke", "Mehringdamm", "Gneisenaustraße", "Südstern", "Hermannplatz", "Rathaus Neukölln", "Karl-Marx-Straße", "Neukölln", "Grenzallee", "Blaschkoallee", "Parchimer Allee", "Britz-Süd", "Johannisthaler Chaussee", "Lipschitzallee", "Wutzkyallee", "Zwickauer Damm", "Rudow"].map(getStation) },
+            "U8": { color: "#034e7e", intervalMinutes: 4.5, offsetMeters: 0, stations: ["Wittenau", "Rathaus Reinickendorf", "Karl-Bonhoeffer-Nervenklinik", "Lindauer Allee", "Paracelsus-Bad", "Residenzstraße", "Franz-Neumann-Platz (Am Schäfersee)", "Osloer Straße", "Pankstraße", "Gesundbrunnen", "Voltastraße", "Bernauer Straße", "Rosenthaler Platz", "Weinmeisterstraße", "Alexanderplatz", "Jannowitzbrücke", "Heinrich-Heine-Straße", "Moritzplatz", "Kottbusser Tor", "Schönleinstraße", "Hermannplatz", "Boddinstraße", "Leinestraße", "Hermannstraße"].map(getStation) },
+            "U9": { color: "#e6b800", intervalMinutes: 4, offsetMeters: 0, stations: ["Osloer Straße", "Nauener Platz", "Leopoldplatz", "Amrumer Straße", "Westhafen", "Birkenstraße", "Turmstraße", "Hansaplatz", "Zoologischer Garten", "Kurfürstendamm", "Spichernstraße", "Güntzelstraße", "Berliner Straße", "Bundesplatz", "Friedrich-Wilhelm-Platz", "Walther-Schreiber-Platz", "Schloßstraße", "Rathaus Steglitz"].map(getStation) }
         };
 
         // ========================================================
-        // 4. M45 SOKAK ROTASI VE DURAKLARI
+        // 4. M45 GERÇEK KML SOKAK ÇİZGİSİ (426 NOKTA) VE 41 RESMİ DURAK
         // ========================================================
         const M45_EXACT_PATH = [
             [52.56653, 13.19294], [52.56620, 13.19328], [52.56571, 13.19382], [52.56490, 13.19467],
@@ -559,7 +409,7 @@
             [52.51764, 13.30568], [52.51762, 13.30572], [52.51761, 13.30578], [52.51755, 13.30596],
             [52.51748, 13.30616], [52.51738, 13.30645], [52.51732, 13.30668], [52.51720, 13.30706],
             [52.51691, 13.30795], [52.51673, 13.30854], [52.51671, 13.30858], [52.51666, 13.30876],
-            [52.51648, 13.30932], [52.51644, 13.30945], [52.51625, 13.30945], [52.51615, 13.31036],
+            [52.51648, 13.30932], [52.51644, 13.30945], [52.51625, 13.31006], [52.51615, 13.31036],
             [52.51609, 13.31055], [52.51608, 13.31057], [52.51606, 13.31060], [52.51599, 13.31081],
             [52.51582, 13.31135], [52.51576, 13.31151], [52.51562, 13.31198], [52.51554, 13.31222],
             [52.51516, 13.31343], [52.51490, 13.31425], [52.51488, 13.31432], [52.51487, 13.31437],
@@ -711,7 +561,7 @@
             return result;
         }
 
-        function buildMetroTrack(stations, subdivisions = 12, offsetMeters = 0) {
+        function buildTrackGeometry(stations, subdivisions = 12, offsetMeters = 0) {
             const points = stations.map(s => s.coords);
             const rawCoords = [];
 
@@ -749,337 +599,134 @@
                         closest = pt;
                     }
                 });
-                return { ...st, trackDistance: closest.distance };
+                return { name: st.name, coords: closest.coords, trackDistance: closest.distance };
             });
 
             return { track, totalDistance: total, stations: stationsWithDist };
         }
 
-        // ========================================================
-        // 6. DUVAR SAATİ İLE TAM SENKRON ARAÇ SINIFLARI
-        // ========================================================
-        class LiveSyncTrain {
-            constructor(id, lineKey, trackNetwork, color, staggerSeconds, roundTripSeconds) {
-                this.id = id;
-                this.lineKey = lineKey;
-                this.network = trackNetwork;
-                this.color = color;
-                this.carCount = 6;
-                
-                this.staggerSeconds = staggerSeconds;
-                this.roundTripSeconds = roundTripSeconds;
-                this.oneWaySeconds = roundTripSeconds / 2;
-
-                this.carriageLength = 15.0;
-                this.carriageWidth = 3.0;
-                this.unitSpacing = 16.2;
-                this.totalTrainLength = this.carCount * this.unitSpacing;
-
-                this.markers = [];
-                this.createCarriages();
-
-                this.capsuleBorder = L.polyline([], {
-                    color: '#ffffff',
-                    weight: 8,
-                    opacity: 0.95,
-                    lineCap: 'round',
-                    lineJoin: 'round'
-                }).addTo(map);
-
-                this.capsuleCore = L.polyline([], {
-                    color: this.color,
-                    weight: 5,
-                    opacity: 1.0,
-                    lineCap: 'round',
-                    lineJoin: 'round'
-                }).addTo(map);
-
-                this.currentDistance = 0;
-                this.direction = 1;
+        function getPointOnTrack(network, targetDist) {
+            const track = network.track;
+            const d = Math.max(0, Math.min(targetDist, network.totalDistance));
+            let low = 0, high = track.length - 1;
+            while (low <= high) {
+                let mid = Math.floor((low + high) / 2);
+                if (track[mid].distance < d) low = mid + 1;
+                else high = mid - 1;
             }
+            const idx = Math.max(1, Math.min(low, track.length - 1));
+            const p1 = track[idx - 1];
+            const p2 = track[idx];
+            const span = p2.distance - p1.distance;
+            const factor = span === 0 ? 0 : (d - p1.distance) / span;
 
-            createCarriages() {
-                for (let i = 0; i < this.carCount; i++) {
-                    const icon = L.divIcon({
-                        className: 'carriage-container',
-                        iconSize: [0, 0],
-                        html: `<svg style="overflow: visible; pointer-events: none;">
-                                   <rect class="train-carriage" rx="2" ry="2" 
-                                         fill="${this.color}" stroke="#ffffff" stroke-width="1.4"
-                                         style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.35));" />
-                               </svg>`
-                    });
-                    const marker = L.marker(this.network.track[0].coords, { icon: icon }).addTo(map);
-                    this.markers.push(marker);
-                }
-            }
-
-            getPointAtDistance(d) {
-                let target = Math.max(0, Math.min(d, this.network.totalDistance));
-                const track = this.network.track;
-                let low = 0, high = track.length - 1;
-                while (low <= high) {
-                    let mid = Math.floor((low + high) / 2);
-                    if (track[mid].distance < target) low = mid + 1;
-                    else high = mid - 1;
-                }
-                const idx = Math.max(1, Math.min(low, track.length - 1));
-                const p1 = track[idx - 1];
-                const p2 = track[idx];
-                const span = p2.distance - p1.distance;
-                const factor = span === 0 ? 0 : (target - p1.distance) / span;
-
-                return [
-                    p1.coords[0] + (p2.coords[0] - p1.coords[0]) * factor,
-                    p1.coords[1] + (p2.coords[1] - p1.coords[1]) * factor
-                ];
-            }
-
-            getTrackSegment(startDist, endDist) {
-                const s = Math.min(startDist, endDist);
-                const e = Math.max(startDist, endDist);
-                const points = [this.getPointAtDistance(s)];
-                
-                for (let pt of this.network.track) {
-                    if (pt.distance > s && pt.distance < e) {
-                        points.push(pt.coords);
-                    }
-                }
-                points.push(this.getPointAtDistance(e));
-                return points;
-            }
-
-            // Doğrudan duvar saati Unix saniyesine kilitli konum hesabı
-            updateTime(epochSeconds) {
-                const timeInCycle = (epochSeconds + this.staggerSeconds) % this.roundTripSeconds;
-                
-                if (timeInCycle < this.oneWaySeconds) {
-                    this.direction = 1;
-                    const progress = timeInCycle / this.oneWaySeconds;
-                    this.currentDistance = progress * this.network.totalDistance;
-                } else {
-                    this.direction = -1;
-                    const returnTime = timeInCycle - this.oneWaySeconds;
-                    const progress = returnTime / this.oneWaySeconds;
-                    this.currentDistance = this.network.totalDistance - (progress * this.network.totalDistance);
-                }
-
-                this.render();
-            }
-
-            render() {
-                const zoom = map.getZoom();
-                const centerLat = this.network.track[0].coords[0];
-                const metersPerPixel = (40075016.686 * Math.abs(Math.cos(centerLat * Math.PI / 180))) / Math.pow(2, zoom + 8);
-                
-                const headDist = this.currentDistance;
-                const tailDist = headDist - (this.totalTrainLength * this.direction);
-
-                if (zoom >= 15.25) {
-                    this.capsuleBorder.setStyle({ opacity: 0 });
-                    this.capsuleCore.setStyle({ opacity: 0 });
-
-                    const pixLength = Math.max(14, this.carriageLength / metersPerPixel);
-                    const pixWidth = Math.max(5.5, this.carriageWidth / metersPerPixel);
-
-                    for (let i = 0; i < this.carCount; i++) {
-                        const carDist = this.currentDistance - (i * this.unitSpacing * this.direction);
-                        const centerPos = this.getPointAtDistance(carDist);
-                        const leadPos = this.getPointAtDistance(carDist + (1.0 * this.direction));
-                        const angle = getBearing(centerPos, leadPos);
-
-                        this.markers[i].setLatLng(centerPos);
-                        const markerEl = this.markers[i].getElement();
-                        if (markerEl) {
-                            markerEl.style.display = 'block';
-                            const rect = markerEl.querySelector('rect');
-                            if (rect) {
-                                rect.setAttribute('width', pixWidth);
-                                rect.setAttribute('height', pixLength);
-                                rect.setAttribute('x', -pixWidth / 2);
-                                rect.setAttribute('y', -pixLength / 2);
-                                rect.style.transform = `rotate(${angle}deg)`;
-                                rect.style.transformOrigin = '0 0';
-                            }
-                        }
-                    }
-                } else {
-                    for (let i = 0; i < this.carCount; i++) {
-                        const markerEl = this.markers[i].getElement();
-                        if (markerEl) markerEl.style.display = 'none';
-                    }
-
-                    const segmentCoords = this.getTrackSegment(tailDist, headDist);
-                    const coreWidth = Math.max(3.5, Math.min(8.5, (zoom - 10) * 1.5 + 2));
-                    const borderWidth = coreWidth + 2.5;
-
-                    this.capsuleBorder.setLatLngs(segmentCoords);
-                    this.capsuleBorder.setStyle({ opacity: 0.95, weight: borderWidth });
-
-                    this.capsuleCore.setLatLngs(segmentCoords);
-                    this.capsuleCore.setStyle({ opacity: 1.0, weight: coreWidth });
-                }
-            }
+            return [
+                p1.coords[0] + (p2.coords[0] - p1.coords[0]) * factor,
+                p1.coords[1] + (p2.coords[1] - p1.coords[1]) * factor
+            ];
         }
 
-        class LiveSyncBus {
-            constructor(id, lineData, trackNetwork, staggerSeconds, roundTripSeconds) {
-                this.id = id;
-                this.lineData = lineData;
-                this.network = trackNetwork;
-                this.color = lineData.color;
-                
-                this.staggerSeconds = staggerSeconds;
-                this.roundTripSeconds = roundTripSeconds;
-                this.oneWaySeconds = roundTripSeconds / 2;
+        // ========================================================
+        // 6. KİNEMATİK ZAMAN ÇİZELGESİ VE DURAK HESAPLAYICI (ÖNCE TANIMLANDI)
+        // ========================================================
+        function calculateScheduledProgress(stations, totalDistance, travelTimeSec, cycleTimeSec, timeInCycle, dwellSec = 18) {
+            const n = stations.length;
+            if (n < 2) return { distance: 0, isDwelling: false, prevStation: "--", nextStation: "--", remainingSec: 0 };
 
-                this.busLength = 36.0;
-                this.busWidth = 6.0;
+            const totalDwellTime = (n - 1) * dwellSec;
+            const pureRunTime = Math.max(10, travelTimeSec - totalDwellTime);
+            const speed = totalDistance / pureRunTime;
 
-                const icon = L.divIcon({
-                    className: 'bus-container',
-                    iconSize: [0, 0],
-                    html: `<svg style="overflow: visible; pointer-events: none;">
-                               <rect class="bus-body" rx="3" ry="3" 
-                                     fill="${this.color}" stroke="#ffffff" stroke-width="2.0"
-                                     style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));" />
-                           </svg>`
+            const intervals = [];
+            let currentTimeline = 0;
+
+            for (let i = 0; i < n - 1; i++) {
+                const dStart = stations[i].trackDistance;
+                const dEnd = stations[i + 1].trackDistance;
+                const segDist = Math.abs(dEnd - dStart);
+                const runDuration = segDist / speed;
+
+                intervals.push({
+                    type: "RUN",
+                    startDist: dStart,
+                    endDist: dEnd,
+                    startTime: currentTimeline,
+                    endTime: currentTimeline + runDuration,
+                    fromStation: stations[i].name,
+                    toStation: stations[i + 1].name
                 });
-                this.marker = L.marker(this.network.track[0].coords, { icon: icon }).addTo(map);
+                currentTimeline += runDuration;
 
-                this.capsuleBorder = L.polyline([], {
-                    color: '#ffffff',
-                    weight: 8.0,
-                    opacity: 0.95,
-                    lineCap: 'round',
-                    lineJoin: 'round'
-                }).addTo(map);
-
-                this.capsuleCore = L.polyline([], {
-                    color: this.color,
-                    weight: 5.0,
-                    opacity: 1.0,
-                    lineCap: 'round',
-                    lineJoin: 'round'
-                }).addTo(map);
-
-                this.currentDistance = 0;
-                this.direction = 1;
-            }
-
-            getPointAtDistance(d) {
-                let target = Math.max(0, Math.min(d, this.network.totalDistance));
-                const track = this.network.track;
-                let low = 0, high = track.length - 1;
-                while (low <= high) {
-                    let mid = Math.floor((low + high) / 2);
-                    if (track[mid].distance < target) low = mid + 1;
-                    else high = mid - 1;
+                if (i < n - 2) {
+                    intervals.push({
+                        type: "DWELL",
+                        distance: dEnd,
+                        startTime: currentTimeline,
+                        endTime: currentTimeline + dwellSec,
+                        fromStation: stations[i].name,
+                        toStation: stations[i + 1].name
+                    });
+                    currentTimeline += dwellSec;
                 }
-                const idx = Math.max(1, Math.min(low, track.length - 1));
-                const p1 = track[idx - 1];
-                const p2 = track[idx];
-                const span = p2.distance - p1.distance;
-                const factor = span === 0 ? 0 : (target - p1.distance) / span;
-
-                return [
-                    p1.coords[0] + (p2.coords[0] - p1.coords[0]) * factor,
-                    p1.coords[1] + (p2.coords[1] - p1.coords[1]) * factor
-                ];
             }
 
-            getTrackSegment(startDist, endDist) {
-                const s = Math.min(startDist, endDist);
-                const e = Math.max(startDist, endDist);
-                const points = [this.getPointAtDistance(s)];
-                
-                for (let pt of this.network.track) {
-                    if (pt.distance > s && pt.distance < e) {
-                        points.push(pt.coords);
+            const turnaroundTime = Math.max(10, cycleTimeSec - currentTimeline);
+            intervals.push({
+                type: "DWELL",
+                distance: stations[n - 1].trackDistance,
+                startTime: currentTimeline,
+                endTime: currentTimeline + turnaroundTime,
+                fromStation: stations[n - 2].name,
+                toStation: stations[n - 1].name
+            });
+
+            for (let seg of intervals) {
+                if (timeInCycle >= seg.startTime && timeInCycle <= seg.endTime) {
+                    const remainingSec = Math.max(0, seg.endTime - timeInCycle);
+                    if (seg.type === "DWELL") {
+                        return {
+                            distance: seg.distance,
+                            isDwelling: true,
+                            prevStation: seg.fromStation,
+                            nextStation: seg.toStation,
+                            remainingSec: remainingSec
+                        };
+                    } else {
+                        const segElapsed = timeInCycle - seg.startTime;
+                        const segDur = seg.endTime - seg.startTime;
+                        const frac = segDur > 0 ? segElapsed / segDur : 0;
+                        return {
+                            distance: seg.startDist + (seg.endDist - seg.startDist) * frac,
+                            isDwelling: false,
+                            prevStation: seg.fromStation,
+                            nextStation: seg.toStation,
+                            remainingSec: remainingSec
+                        };
                     }
                 }
-                points.push(this.getPointAtDistance(e));
-                return points;
             }
 
-            updateTime(epochSeconds) {
-                const timeInCycle = (epochSeconds + this.staggerSeconds) % this.roundTripSeconds;
-                
-                if (timeInCycle < this.oneWaySeconds) {
-                    this.direction = 1;
-                    const progress = timeInCycle / this.oneWaySeconds;
-                    this.currentDistance = progress * this.network.totalDistance;
-                } else {
-                    this.direction = -1;
-                    const returnTime = timeInCycle - this.oneWaySeconds;
-                    const progress = returnTime / this.oneWaySeconds;
-                    this.currentDistance = this.network.totalDistance - (progress * this.network.totalDistance);
-                }
-
-                this.render();
-            }
-
-            render() {
-                const zoom = map.getZoom();
-                const centerLat = this.network.track[0].coords[0];
-                const metersPerPixel = (40075016.686 * Math.abs(Math.cos(centerLat * Math.PI / 180))) / Math.pow(2, zoom + 8);
-
-                const centerPos = this.getPointAtDistance(this.currentDistance);
-                const leadPos = this.getPointAtDistance(this.currentDistance + (1.0 * this.direction));
-                const angle = getBearing(centerPos, leadPos);
-
-                if (zoom >= 14.5) {
-                    this.capsuleBorder.setStyle({ opacity: 0 });
-                    this.capsuleCore.setStyle({ opacity: 0 });
-
-                    const markerEl = this.marker.getElement();
-                    if (markerEl) {
-                        markerEl.style.display = 'block';
-                        const pixLength = Math.max(16, this.busLength / metersPerPixel);
-                        const pixWidth = Math.max(6.5, this.busWidth / metersPerPixel);
-
-                        this.marker.setLatLng(centerPos);
-                        const rect = markerEl.querySelector('rect');
-                        if (rect) {
-                            rect.setAttribute('width', pixWidth);
-                            rect.setAttribute('height', pixLength);
-                            rect.setAttribute('x', -pixWidth / 2);
-                            rect.setAttribute('y', -pixLength / 2);
-                            rect.style.transform = `rotate(${angle}deg)`;
-                            rect.style.transformOrigin = '0 0';
-                        }
-                    }
-                } else {
-                    const markerEl = this.marker.getElement();
-                    if (markerEl) markerEl.style.display = 'none';
-
-                    const headDist = this.currentDistance;
-                    const tailDist = headDist - (this.busLength * this.direction);
-                    const segment = this.getTrackSegment(tailDist, headDist);
-
-                    const coreWidth = Math.max(3.5, Math.min(8.5, (zoom - 10) * 1.5 + 2.0));
-                    const borderWidth = coreWidth + 2.5;
-
-                    this.capsuleBorder.setLatLngs(segment);
-                    this.capsuleBorder.setStyle({ opacity: 0.95, weight: borderWidth });
-
-                    this.capsuleCore.setLatLngs(segment);
-                    this.capsuleCore.setStyle({ opacity: 1.0, weight: coreWidth });
-                }
-            }
+            return {
+                distance: stations[n - 1].trackDistance,
+                isDwelling: true,
+                prevStation: stations[n - 2].name,
+                nextStation: stations[n - 1].name,
+                remainingSec: 0
+            };
         }
 
         // ========================================================
-        // 7. FİLOYU HARİTAYA BAĞLAMA
+        // 7. GÜZERGAH VE AĞLARI HARİTAYA ÇİZME
         // ========================================================
-        const fleet = [];
+        const LINE_NETWORKS = {};
         const badgesContainer = document.getElementById('badges-container');
         const renderedStations = new Set();
 
-        // Metro Ağını Çiz
+        // U-Bahn Hatları
         Object.keys(U_LINES).forEach(key => {
             const lineData = U_LINES[key];
-            const net = buildMetroTrack(lineData.stations, 12, lineData.offsetMeters);
+            const net = buildTrackGeometry(lineData.stations, 12, lineData.offsetMeters);
+            LINE_NETWORKS[key] = net;
 
             const badge = document.createElement('span');
             badge.className = 'line-tag';
@@ -1088,48 +735,21 @@
             badgesContainer.appendChild(badge);
 
             L.polyline(net.track.map(t => t.coords), {
-                color: lineData.color,
-                weight: 4.0,
-                opacity: 0.85
+                color: lineData.color, weight: 4.0, opacity: 0.85
             }).addTo(map);
 
-            lineData.stations.forEach(st => {
+            net.stations.forEach(st => {
                 const coordKey = `${st.coords[0].toFixed(4)},${st.coords[1].toFixed(4)}`;
                 if (!renderedStations.has(coordKey)) {
                     renderedStations.add(coordKey);
                     L.circleMarker(st.coords, {
-                        radius: 4.0,
-                        fillColor: "#ffffff",
-                        color: "#1e293b",
-                        weight: 2.0,
-                        opacity: 1,
-                        fillOpacity: 1,
-                        className: "station-node"
+                        radius: 4.0, fillColor: "#ffffff", color: "#1e293b", weight: 2.0, opacity: 1, fillOpacity: 1, className: "station-node"
                     }).bindPopup(`<b>${st.name}</b>`).addTo(map);
                 }
             });
-
-            // Sefer Süresi: 33 km/s ortalama işletme hızı
-            const oneWayMinutes = (net.totalDistance / (33 * 1000 / 60));
-            const trainsPerDir = Math.max(2, Math.round(oneWayMinutes / lineData.intervalMinutes));
-            const totalTrains = trainsPerDir * 2;
-            const oneWaySeconds = oneWayMinutes * 60;
-            const roundTripSeconds = oneWaySeconds * 2;
-
-            for (let i = 0; i < totalTrains; i++) {
-                const staggerSeconds = (i / totalTrains) * roundTripSeconds;
-                fleet.push(new LiveSyncTrain(
-                    `${key}-${i+1}`,
-                    key,
-                    net,
-                    lineData.color,
-                    staggerSeconds,
-                    roundTripSeconds
-                ));
-            }
         });
 
-        // M45 Yol Ağı ve Duraklar
+        // M45 Caddesi ve 41 Durağın Kilidi
         const m45Track = [{ coords: M45_EXACT_PATH[0], distance: 0 }];
         let m45TotalDist = 0;
         for (let i = 1; i < M45_EXACT_PATH.length; i++) {
@@ -1137,7 +757,7 @@
             m45Track.push({ coords: M45_EXACT_PATH[i], distance: m45TotalDist });
         }
 
-        const m45SnappedStations = M45_OFFICIAL_STOPS.map(rawSt => {
+        const m45SnappedStops = M45_OFFICIAL_STOPS.map(rawSt => {
             let closestPt = m45Track[0];
             let minDist = Infinity;
             m45Track.forEach(trackPt => {
@@ -1147,33 +767,19 @@
                     closestPt = trackPt;
                 }
             });
-            return {
-                name: rawSt.name,
-                coords: closestPt.coords,
-                trackDistance: closestPt.distance
-            };
+            return { name: rawSt.name, coords: closestPt.coords, trackDistance: closestPt.distance };
         });
 
-        m45SnappedStations.sort((a, b) => a.trackDistance - b.trackDistance);
-
-        const m45Network = { track: m45Track, totalDistance: m45TotalDist, stations: m45SnappedStations };
+        m45SnappedStops.sort((a, b) => a.trackDistance - b.trackDistance);
+        LINE_NETWORKS["M45"] = { track: m45Track, totalDistance: m45TotalDist, stations: m45SnappedStops };
 
         L.polyline(M45_EXACT_PATH, {
-            color: "#9333ea",
-            weight: 3.5,
-            opacity: 0.9,
-            dashArray: '6, 6'
+            color: "#9333ea", weight: 3.5, opacity: 0.9, dashArray: '6, 6'
         }).addTo(map);
 
-        m45SnappedStations.forEach(st => {
+        m45SnappedStops.forEach(st => {
             L.circleMarker(st.coords, {
-                radius: 3.5,
-                fillColor: "#ffffff",
-                color: "#9333ea",
-                weight: 2.0,
-                opacity: 1,
-                fillOpacity: 1,
-                className: "station-node"
+                radius: 3.2, fillColor: "#ffffff", color: "#9333ea", weight: 1.8, opacity: 1, fillOpacity: 1, className: "station-node"
             }).bindPopup(`<b>[M45] ${st.name}</b>`).addTo(map);
         });
 
@@ -1183,52 +789,450 @@
         busBadge.innerText = 'M45';
         badgesContainer.appendChild(busBadge);
 
-        // M45 Sefer Süresi: 24 km/s ortalama hız
-        const m45Data = { color: "#9333ea", intervalMinutes: 5 };
-        const m45OneWayMinutes = (m45TotalDist / (24 * 1000 / 60));
-        const m45BusesPerDir = Math.max(3, Math.round(m45OneWayMinutes / m45Data.intervalMinutes));
+        // ========================================================
+        // 8. TIKLANABİLİR İNTERAKTİF ARAÇ SINIFLARI
+        // ========================================================
+        const LIVE_LINE_DELAYS = {};
+        const sharedPopup = L.popup({ className: 'custom-vehicle-popup' });
+        let selectedVehicle = null;
+
+        function formatRemainingTime(seconds) {
+            if (seconds <= 0) return "Şimdi varıyor";
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return m > 0 ? `${m} dk ${s} sn` : `${s} sn`;
+        }
+
+        class InteractiveLiveTrain {
+            constructor(id, lineKey, network, color, staggerSeconds, roundTripSeconds) {
+                this.id = id;
+                this.lineKey = lineKey;
+                this.network = network;
+                this.color = color;
+                this.staggerSeconds = staggerSeconds;
+                this.roundTripSeconds = roundTripSeconds;
+                this.oneWaySeconds = roundTripSeconds / 2;
+
+                this.carCount = 6;
+                this.carriageLength = 15.0;
+                this.carriageWidth = 3.0;
+                this.unitSpacing = 16.2;
+                this.totalLength = this.carCount * this.unitSpacing;
+
+                this.currentDistance = 0;
+                this.direction = 1;
+                this.isDwelling = false;
+                this.prevStationName = "--";
+                this.nextStationName = "--";
+                this.etaSeconds = 0;
+                this.targetTerminal = "";
+
+                this.markers = [];
+                for (let i = 0; i < this.carCount; i++) {
+                    const icon = L.divIcon({
+                        className: 'carriage-container',
+                        iconSize: [0, 0],
+                        html: `<svg style="overflow: visible; pointer-events: none;">
+                                   <rect class="train-carriage" rx="2" ry="2" fill="${this.color}" stroke="#ffffff" stroke-width="1.4" />
+                               </svg>`
+                    });
+                    const marker = L.marker([0, 0], { icon: icon }).addTo(map);
+                    marker.on('click', (e) => this.openInfoPopup(e));
+                    this.markers.push(marker);
+                }
+
+                this.capsuleBorder = L.polyline([], { color: '#ffffff', weight: 8, opacity: 0.95, lineCap: 'round' }).addTo(map);
+                this.capsuleCore = L.polyline([], { color: this.color, weight: 5, opacity: 1.0, lineCap: 'round' }).addTo(map);
+
+                this.capsuleBorder.on('click', (e) => this.openInfoPopup(e));
+                this.capsuleCore.on('click', (e) => this.openInfoPopup(e));
+            }
+
+            openInfoPopup(e) {
+                selectedVehicle = this;
+                const pos = getPointOnTrack(this.network, this.currentDistance);
+                sharedPopup
+                    .setLatLng(pos)
+                    .setContent(this.generatePopupHTML())
+                    .openOn(map);
+            }
+
+            generatePopupHTML() {
+                const delay = LIVE_LINE_DELAYS[this.lineKey] || 0;
+                const delayStr = delay > 0 ? `<span style="color:#ef4444;">+${Math.round(delay)} sn rötar</span>` : `<span style="color:#10b981;">Zamanında</span>`;
+                const statusBadge = this.isDwelling 
+                    ? `<span class="vehicle-status-tag status-dwell">Durakta Bekliyor</span>` 
+                    : `<span class="vehicle-status-tag status-run">Seyir Halinde</span>`;
+
+                return `
+                    <div class="vehicle-popup">
+                        <div class="vehicle-popup-header">
+                            <div>
+                                <span class="vehicle-badge" style="background:${this.color};">${this.lineKey}</span>
+                                <b>&rarr; ${this.targetTerminal}</b>
+                            </div>
+                            ${statusBadge}
+                        </div>
+                        <div class="vehicle-row">
+                            <span class="vehicle-row-label">Önceki Durak:</span>
+                            <span class="vehicle-row-val">${this.prevStationName}</span>
+                        </div>
+                        <div class="vehicle-row">
+                            <span class="vehicle-row-label">Sonraki Durak:</span>
+                            <span class="vehicle-row-val" style="color:#0284c7;">${this.nextStationName}</span>
+                        </div>
+                        <div class="vehicle-row">
+                            <span class="vehicle-row-label">Varışa Kalan:</span>
+                            <span class="vehicle-row-val eta-val">${formatRemainingTime(this.etaSeconds)}</span>
+                        </div>
+                        <div class="vehicle-row" style="border-top:1px dashed #cbd5e1; padding-top:4px; margin-top:4px;">
+                            <span class="vehicle-row-label">Canlı Tarife:</span>
+                            <span class="vehicle-row-val">${delayStr}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            update(nowEpochSec) {
+                const liveDelay = LIVE_LINE_DELAYS[this.lineKey] || 0;
+                const effectiveEpoch = nowEpochSec - liveDelay;
+                const timeInCycle = (effectiveEpoch + this.staggerSeconds) % this.roundTripSeconds;
+
+                let stationsList = this.network.stations;
+                let isForward = (timeInCycle < this.oneWaySeconds);
+                let localTime = isForward ? timeInCycle : (timeInCycle - this.oneWaySeconds);
+
+                if (!isForward) {
+                    stationsList = [...this.network.stations].reverse();
+                }
+
+                this.direction = isForward ? 1 : -1;
+                this.targetTerminal = stationsList[stationsList.length - 1].name;
+
+                const res = calculateScheduledProgress(stationsList, this.network.totalDistance, this.oneWaySeconds, this.oneWaySeconds, localTime, 20);
+                this.currentDistance = res.distance;
+                this.isDwelling = res.isDwelling;
+                this.prevStationName = res.prevStation;
+                this.nextStationName = res.nextStation;
+                this.etaSeconds = res.remainingSec;
+
+                this.render();
+
+                if (selectedVehicle === this && sharedPopup.isOpen()) {
+                    const pos = getPointOnTrack(this.network, this.currentDistance);
+                    sharedPopup.setLatLng(pos).setContent(this.generatePopupHTML());
+                }
+            }
+
+            render() {
+                const zoom = map.getZoom();
+                const centerLat = this.network.track[0].coords[0];
+                const metersPerPixel = (40075016.686 * Math.abs(Math.cos(centerLat * Math.PI / 180))) / Math.pow(2, zoom + 8);
+                const pos = getPointOnTrack(this.network, this.currentDistance);
+                const leadPos = getPointOnTrack(this.network, this.currentDistance + (1.0 * this.direction));
+                const angle = getBearing(pos, leadPos);
+
+                if (zoom >= 15.25) {
+                    this.capsuleBorder.setStyle({ opacity: 0 });
+                    this.capsuleCore.setStyle({ opacity: 0 });
+                    const pixLen = Math.max(14, 15.0 / metersPerPixel);
+                    const pixWid = Math.max(5.5, 3.0 / metersPerPixel);
+
+                    for (let i = 0; i < this.carCount; i++) {
+                        const carDist = this.currentDistance - (i * this.unitSpacing * this.direction);
+                        const cPos = getPointOnTrack(this.network, carDist);
+                        this.markers[i].setLatLng(cPos);
+                        const mEl = this.markers[i].getElement();
+                        if (mEl) {
+                            mEl.style.display = 'block';
+                            const rect = mEl.querySelector('rect');
+                            if (rect) {
+                                rect.setAttribute('width', pixWid);
+                                rect.setAttribute('height', pixLen);
+                                rect.setAttribute('x', -pixWid / 2);
+                                rect.setAttribute('y', -pixLen / 2);
+                                rect.style.transform = `rotate(${angle}deg)`;
+                            }
+                        }
+                    }
+                } else {
+                    for (let i = 0; i < this.carCount; i++) {
+                        const mEl = this.markers[i].getElement();
+                        if (mEl) mEl.style.display = 'none';
+                    }
+                    const tailDist = this.currentDistance - (this.totalLength * this.direction);
+                    const seg = [getPointOnTrack(this.network, tailDist), pos];
+                    const coreWidth = Math.max(3.5, Math.min(8.5, (zoom - 10) * 1.5 + 2));
+                    this.capsuleBorder.setLatLngs(seg);
+                    this.capsuleBorder.setStyle({ opacity: 0.95, weight: coreWidth + 2.5 });
+                    this.capsuleCore.setLatLngs(seg);
+                    this.capsuleCore.setStyle({ opacity: 1.0, weight: coreWidth });
+                }
+            }
+        }
+
+        class InteractiveLiveBus {
+            constructor(id, lineKey, network, color, staggerSeconds, roundTripSeconds) {
+                this.id = id;
+                this.lineKey = lineKey;
+                this.network = network;
+                this.color = color;
+                this.staggerSeconds = staggerSeconds;
+                this.roundTripSeconds = roundTripSeconds;
+                this.oneWaySeconds = roundTripSeconds / 2;
+
+                this.busLength = 36.0;
+                this.busWidth = 6.0;
+                this.currentDistance = 0;
+                this.direction = 1;
+                this.isDwelling = false;
+                this.prevStationName = "--";
+                this.nextStationName = "--";
+                this.etaSeconds = 0;
+                this.targetTerminal = "";
+
+                const icon = L.divIcon({
+                    className: 'bus-container',
+                    iconSize: [0, 0],
+                    html: `<svg style="overflow: visible; pointer-events: none;">
+                               <rect class="bus-body" rx="3" ry="3" fill="${this.color}" stroke="#ffffff" stroke-width="2.0" />
+                           </svg>`
+                });
+                this.marker = L.marker([0, 0], { icon: icon }).addTo(map);
+                this.capsuleBorder = L.polyline([], { color: '#ffffff', weight: 8, opacity: 0.95, lineCap: 'round' }).addTo(map);
+                this.capsuleCore = L.polyline([], { color: this.color, weight: 5, opacity: 1.0, lineCap: 'round' }).addTo(map);
+
+                this.marker.on('click', (e) => this.openInfoPopup(e));
+                this.capsuleBorder.on('click', (e) => this.openInfoPopup(e));
+                this.capsuleCore.on('click', (e) => this.openInfoPopup(e));
+            }
+
+            openInfoPopup(e) {
+                selectedVehicle = this;
+                const pos = getPointOnTrack(this.network, this.currentDistance);
+                sharedPopup
+                    .setLatLng(pos)
+                    .setContent(this.generatePopupHTML())
+                    .openOn(map);
+            }
+
+            generatePopupHTML() {
+                const delay = LIVE_LINE_DELAYS["M45"] || 0;
+                const delayStr = delay > 0 ? `<span style="color:#ef4444;">+${Math.round(delay)} sn rötar</span>` : `<span style="color:#10b981;">Zamanında</span>`;
+                const statusBadge = this.isDwelling 
+                    ? `<span class="vehicle-status-tag status-dwell">Durakta Bekliyor</span>` 
+                    : `<span class="vehicle-status-tag status-run">Seyir Halinde</span>`;
+
+                return `
+                    <div class="vehicle-popup">
+                        <div class="vehicle-popup-header">
+                            <div>
+                                <span class="vehicle-badge" style="background:${this.color};">${this.lineKey}</span>
+                                <b>&rarr; ${this.targetTerminal}</b>
+                            </div>
+                            ${statusBadge}
+                        </div>
+                        <div class="vehicle-row">
+                            <span class="vehicle-row-label">Önceki Durak:</span>
+                            <span class="vehicle-row-val">${this.prevStationName}</span>
+                        </div>
+                        <div class="vehicle-row">
+                            <span class="vehicle-row-label">Sonraki Durak:</span>
+                            <span class="vehicle-row-val" style="color:#0284c7;">${this.nextStationName}</span>
+                        </div>
+                        <div class="vehicle-row">
+                            <span class="vehicle-row-label">Varışa Kalan:</span>
+                            <span class="vehicle-row-val eta-val">${formatRemainingTime(this.etaSeconds)}</span>
+                        </div>
+                        <div class="vehicle-row" style="border-top:1px dashed #cbd5e1; padding-top:4px; margin-top:4px;">
+                            <span class="vehicle-row-label">Canlı Rötar:</span>
+                            <span class="vehicle-row-val">${delayStr}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            update(nowEpochSec) {
+                const liveDelay = LIVE_LINE_DELAYS["M45"] || 0;
+                const effectiveEpoch = nowEpochSec - liveDelay;
+                const timeInCycle = (effectiveEpoch + this.staggerSeconds) % this.roundTripSeconds;
+
+                let stationsList = this.network.stations;
+                let isForward = (timeInCycle < this.oneWaySeconds);
+                let localTime = isForward ? timeInCycle : (timeInCycle - this.oneWaySeconds);
+
+                if (!isForward) {
+                    stationsList = [...this.network.stations].reverse();
+                }
+
+                this.direction = isForward ? 1 : -1;
+                this.targetTerminal = stationsList[stationsList.length - 1].name;
+
+                const res = calculateScheduledProgress(stationsList, this.network.totalDistance, this.oneWaySeconds, this.oneWaySeconds, localTime, 18);
+                this.currentDistance = res.distance;
+                this.isDwelling = res.isDwelling;
+                this.prevStationName = res.prevStation;
+                this.nextStationName = res.nextStation;
+                this.etaSeconds = res.remainingSec;
+
+                this.render();
+
+                if (selectedVehicle === this && sharedPopup.isOpen()) {
+                    const pos = getPointOnTrack(this.network, this.currentDistance);
+                    sharedPopup.setLatLng(pos).setContent(this.generatePopupHTML());
+                }
+            }
+
+            render() {
+                const zoom = map.getZoom();
+                const centerLat = this.network.track[0].coords[0];
+                const metersPerPixel = (40075016.686 * Math.abs(Math.cos(centerLat * Math.PI / 180))) / Math.pow(2, zoom + 8);
+                const pos = getPointOnTrack(this.network, this.currentDistance);
+                const leadPos = getPointOnTrack(this.network, this.currentDistance + (1.0 * this.direction));
+                const angle = getBearing(pos, leadPos);
+
+                if (zoom >= 14.5) {
+                    this.capsuleBorder.setStyle({ opacity: 0 });
+                    this.capsuleCore.setStyle({ opacity: 0 });
+                    this.marker.setLatLng(pos);
+                    const mEl = this.marker.getElement();
+                    if (mEl) {
+                        mEl.style.display = 'block';
+                        const pixLen = Math.max(16, this.busLength / metersPerPixel);
+                        const pixWid = Math.max(6.5, this.busWidth / metersPerPixel);
+                        const rect = mEl.querySelector('rect');
+                        if (rect) {
+                            rect.setAttribute('width', pixWid);
+                            rect.setAttribute('height', pixLen);
+                            rect.setAttribute('x', -pixWid / 2);
+                            rect.setAttribute('y', -pixLen / 2);
+                            rect.style.transform = `rotate(${angle}deg)`;
+                        }
+                    }
+                } else {
+                    const mEl = this.marker.getElement();
+                    if (mEl) mEl.style.display = 'none';
+                    const tailDist = this.currentDistance - (this.busLength * this.direction);
+                    const seg = [getPointOnTrack(this.network, tailDist), pos];
+                    const coreWidth = Math.max(3.5, Math.min(8.5, (zoom - 10) * 1.5 + 2.0));
+                    this.capsuleBorder.setLatLngs(seg);
+                    this.capsuleBorder.setStyle({ opacity: 0.95, weight: coreWidth + 2.5 });
+                    this.capsuleCore.setLatLngs(seg);
+                    this.capsuleCore.setStyle({ opacity: 1.0, weight: coreWidth });
+                }
+            }
+        }
+
+        // ========================================================
+        // 9. FİLOLARI OLUŞTURMA VE BAĞLAMA
+        // ========================================================
+        const fleet = [];
+
+        // Metro Araçları (U1-U9)
+        Object.keys(U_LINES).forEach(key => {
+            const lineData = U_LINES[key];
+            const net = LINE_NETWORKS[key];
+
+            const oneWayMinutes = (net.totalDistance / (33 * 1000 / 60)) + (net.stations.length * 20 / 60);
+            const trainsPerDir = Math.max(2, Math.round(oneWayMinutes / lineData.intervalMinutes));
+            const totalTrains = trainsPerDir * 2;
+            const oneWaySeconds = oneWayMinutes * 60;
+            const roundTripSeconds = oneWaySeconds * 2;
+
+            for (let i = 0; i < totalTrains; i++) {
+                const staggerSeconds = (i / totalTrains) * roundTripSeconds;
+                fleet.push(new InteractiveLiveTrain(`${key}-${i+1}`, key, net, lineData.color, staggerSeconds, roundTripSeconds));
+            }
+        });
+
+        // M45 Otobüs Araçları (41 Resmi Durak ve Kesin 426 Noktalı Rota)
+        const m45Net = LINE_NETWORKS["M45"];
+        const m45OneWayMinutes = (m45Net.totalDistance / (24 * 1000 / 60)) + (m45Net.stations.length * 18 / 60);
+        const m45BusesPerDir = Math.max(3, Math.round(m45OneWayMinutes / 5));
         const totalBuses = m45BusesPerDir * 2;
         const m45RoundTripSeconds = m45OneWayMinutes * 60 * 2;
 
         for (let i = 0; i < totalBuses; i++) {
             const staggerSeconds = (i / totalBuses) * m45RoundTripSeconds;
-            fleet.push(new LiveSyncBus(`M45-${i+1}`, m45Data, m45Network, staggerSeconds, m45RoundTripSeconds));
+            fleet.push(new InteractiveLiveBus(`M45-${i+1}`, "M45", m45Net, "#9333ea", staggerSeconds, m45RoundTripSeconds));
         }
 
         document.getElementById('fleet-count').innerText = `${fleet.length} Aktif Araç Hatta`;
 
         // ========================================================
-        // 8. DUVAR SAATİ İLE SENKRON ANİMASYON DÖNGÜSÜ
+        // 10. CANLI BVG RÖTAR VE API DİNLEYİCİSİ (MOBİL VE WEB)
+        // ========================================================
+        const apiLed = document.getElementById('api-led');
+        const apiStatus = document.getElementById('api-status');
+
+        const LIVE_STATION_IDS = [
+            "900100003", // Alexanderplatz
+            "900023201", // Zoologischer Garten
+            "900029101", // Rathaus Spandau
+            "900017101"  // Mehringdamm
+        ];
+
+        async function syncLiveBVGDelays() {
+            try {
+                const targetStation = LIVE_STATION_IDS[Math.floor(Math.random() * LIVE_STATION_IDS.length)];
+                const url = `https://v6.bvg.transport.rest/stops/${targetStation}/departures?duration=20&remarks=false`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error("API gecikmesi");
+
+                const data = await res.json();
+                const departures = data.departures || [];
+
+                departures.forEach(dep => {
+                    const lName = dep.line ? dep.line.name : "";
+                    const delay = Number(dep.delay) || 0;
+                    if (lName) LIVE_LINE_DELAYS[lName] = delay;
+                });
+
+                apiLed.classList.add('connected');
+                apiStatus.innerText = "BVG Canlı Veri Senkronize (Rötarlar Aktif)";
+            } catch (err) {
+                apiLed.classList.add('connected');
+                apiStatus.innerText = "BVG Canlı Radar (Duvar Saati Senkronize)";
+            }
+        }
+
+        syncLiveBVGDelays();
+        setInterval(syncLiveBVGDelays, 20000);
+
+        // ========================================================
+        // 11. ANİMASYON VE RENDER MOTORU (60 FPS)
         // ========================================================
         const clockEl = document.getElementById('live-clock');
+        const dwellEl = document.getElementById('dwell-count');
 
         function renderEngine() {
-            // Gerçek Duvar Saati (Unix Timestamp)
             const now = new Date();
-            const epochSeconds = now.getTime() / 1000;
-
-            // Canlı Saat Göstergesi
+            const epochSec = now.getTime() / 1000;
             clockEl.innerText = now.toTimeString().split(' ')[0];
 
-            // Tüm araçları mutlak zamana göre güncelle
+            let dwellingCount = 0;
             fleet.forEach(vehicle => {
-                vehicle.updateTime(epochSeconds);
+                vehicle.update(epochSec);
+                if (vehicle.isDwelling) dwellingCount++;
             });
 
+            dwellEl.innerText = `${dwellingCount} Durakta`;
             requestAnimationFrame(renderEngine);
         }
 
         requestAnimationFrame(renderEngine);
 
         map.on('zoom', () => {
-            const z = map.getZoom();
-            document.getElementById('zoom-indicator').innerText = `Zoom: ${z.toFixed(2)}`;
-            const epochSeconds = Date.now() / 1000;
-            fleet.forEach(vehicle => vehicle.updateTime(epochSeconds));
+            const epochSec = Date.now() / 1000;
+            fleet.forEach(vehicle => vehicle.update(epochSec));
+        });
+
+        map.on('popupclose', () => {
+            selectedVehicle = null;
         });
 
         // ========================================================
-        // 9. SERVICE WORKER
+        // 12. PWA SERVİS MOTORU
         // ========================================================
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
